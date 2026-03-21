@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui'
 import {
   FileQuestion,
@@ -8,12 +9,16 @@ import {
   Target,
   Clock,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react'
 import Link from 'next/link'
 
+type StatType = 'total' | 'knowledge' | 'weekly' | 'mastered'
+
 const stats = [
   {
+    id: 'total' as StatType,
     label: '总错题数',
     value: '126',
     icon: FileQuestion,
@@ -21,6 +26,7 @@ const stats = [
     trend: '+12',
   },
   {
+    id: 'knowledge' as StatType,
     label: '知识点',
     value: '45',
     icon: Lightbulb,
@@ -28,6 +34,7 @@ const stats = [
     trend: '+5',
   },
   {
+    id: 'weekly' as StatType,
     label: '本周新增',
     value: '23',
     icon: TrendingUp,
@@ -35,6 +42,7 @@ const stats = [
     trend: '+8',
   },
   {
+    id: 'mastered' as StatType,
     label: '已掌握',
     value: '34',
     icon: Target,
@@ -42,6 +50,45 @@ const stats = [
     trend: '+3',
   },
 ]
+
+// 详细数据
+const detailData: Record<StatType, { title: string; items: { label: string; value: string }[] }> = {
+  total: {
+    title: '总错题详情',
+    items: [
+      { label: '数学', value: '45' },
+      { label: '物理', value: '32' },
+      { label: '英语', value: '28' },
+      { label: '化学', value: '15' },
+      { label: '语文', value: '6' },
+    ],
+  },
+  knowledge: {
+    title: '知识点分布',
+    items: [
+      { label: '二次函数', value: '15' },
+      { label: '动能定理', value: '12' },
+      { label: '从句语法', value: '10' },
+      { label: '化学方程式', value: '8' },
+    ],
+  },
+  weekly: {
+    title: '本周新增详情',
+    items: [
+      { label: '今天新增', value: '5' },
+      { label: '昨天新增', value: '8' },
+      { label: '前天新增', value: '4' },
+      { label: '更早', value: '6' },
+    ],
+  },
+  mastered: {
+    title: '已掌握详情',
+    items: [
+      { label: '完全掌握', value: '20' },
+      { label: '基本掌握', value: '14' },
+    ],
+  },
+}
 
 const recentQuestions = [
   {
@@ -72,6 +119,16 @@ const weakPoints = [
 ]
 
 export default function DashboardPage() {
+  const [selectedStat, setSelectedStat] = useState<StatType | null>(null)
+
+  const handleStatClick = (statId: StatType) => {
+    setSelectedStat(statId)
+  }
+
+  const closeModal = () => {
+    setSelectedStat(null)
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* 欢迎区域 */}
@@ -84,10 +141,15 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* 统计卡片 */}
+      {/* 统计卡片 - 可点击 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <Card key={stat.label} hover className="p-4">
+          <Card
+            key={stat.id}
+            hover
+            className="p-4 cursor-pointer hover:shadow-md transition-all"
+            onClick={() => handleStatClick(stat.id)}
+          >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm text-text-secondary">{stat.label}</p>
@@ -97,6 +159,9 @@ export default function DashboardPage() {
               <div className={`${stat.color} p-2.5 rounded-xl`}>
                 <stat.icon className="w-5 h-5 text-white" />
               </div>
+            </div>
+            <div className="mt-2 text-xs text-text-light text-center pt-2 border-t border-border/50">
+              点击查看详情
             </div>
           </Card>
         ))}
@@ -206,6 +271,36 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 详情弹窗 */}
+      {selectedStat && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeModal}>
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h3 className="font-semibold text-text-primary">{detailData[selectedStat].title}</h3>
+              <button onClick={closeModal} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-text-secondary" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+              {detailData[selectedStat].items.map((item, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-text-primary">{item.label}</span>
+                  <span className="font-semibold text-sky">{item.value}</span>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 border-t border-border">
+              <button
+                onClick={closeModal}
+                className="w-full py-2 px-4 bg-sky text-white rounded-lg hover:bg-sky-dark transition-colors"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

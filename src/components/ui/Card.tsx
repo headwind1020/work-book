@@ -1,17 +1,20 @@
-import { ReactNode } from 'react'
+import { ReactNode, MouseEventHandler } from 'react'
 
 interface CardProps {
   children: ReactNode
   className?: string
   hover?: boolean
+  onClick?: MouseEventHandler<HTMLDivElement>
 }
 
-export function Card({ children, className = '', hover = false }: CardProps) {
+export function Card({ children, className = '', hover = false, onClick }: CardProps) {
   return (
     <div
+      onClick={onClick}
       className={`
         bg-white rounded-2xl shadow-sm border border-border/50
         ${hover ? 'card-hover cursor-pointer' : ''}
+        ${onClick ? 'cursor-pointer' : ''}
         ${className}
       `}
     >

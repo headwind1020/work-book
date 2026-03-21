@@ -36,7 +36,7 @@ export default function MainLayout({
   return (
     <div className="min-h-screen content-bg">
       {/* 顶部导航 */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-border z-50">
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-border z-[9999]">
         <div className="h-full px-4 lg:px-6 flex items-center justify-between">
           {/* 左侧 Logo */}
           <div className="flex items-center gap-3">
@@ -71,7 +71,7 @@ export default function MainLayout({
       <aside
         className={`
           fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-border
-          transform transition-transform duration-200 z-40
+          transform transition-transform duration-200 z-[9998]
           lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
@@ -102,6 +102,14 @@ export default function MainLayout({
         {/* 底部登出 */}
         <div className="absolute bottom-4 left-4 right-4">
           <button
+            onClick={() => {
+              if (confirm('确定要退出登录吗？')) {
+                // 清除本地存储的登录状态
+                localStorage.removeItem('wrong-book-storage')
+                // 跳转到登录页
+                window.location.href = '/login'
+              }
+            }}
             className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-text-secondary hover:bg-error/10 hover:text-error transition-all"
           >
             <LogOut className="w-5 h-5" />
@@ -113,7 +121,7 @@ export default function MainLayout({
       {/* 遮罩层 */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/20 z-[9997] lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}

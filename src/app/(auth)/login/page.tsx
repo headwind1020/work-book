@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { CloudBackground, Button, Input } from '@/components/ui'
 import { BookOpen, Mail, Lock, ArrowRight } from 'lucide-react'
+import { signIn } from '@/lib/database'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,11 +19,24 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
-    // 模拟登录（实际应该调用 Supabase）
-    setTimeout(() => {
-      // 模拟成功登录
+    try {
+      await signIn(email, password)
       router.push('/dashboard')
-    }, 1000)
+    } catch (err: any) {
+      console.error('登录错误:', err)
+      // 提供更友好的错误提示
+      if (err.message?.includes('Invalid login credentials')) {
+        setError('邮箱或密码错误，请检查后重试')
+      } else if (err.message?.includes('Email not confirmed')) {
+        setError('请先前往邮箱验证您的账号')
+      } else if (err.message?.includes('Too many requests')) {
+        setError('登录尝试过多，请稍后再试')
+      } else {
+        setError(err.message || '登录失败，请检查邮箱和密码')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
