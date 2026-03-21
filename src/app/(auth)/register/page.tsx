@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { CloudBackground, Button, Input, Select } from '@/components/ui'
 import { BookOpen, Mail, Lock, User, ArrowRight, GraduationCap } from 'lucide-react'
+import { signUp } from '@/lib/database'
 
 const roleOptions = [
   { value: 'student', label: '学生' },
@@ -36,12 +37,37 @@ export default function RegisterPage() {
       return
     }
 
+    if (!name.trim()) {
+      setError('请输入姓名')
+      return
+    }
+
     setLoading(true)
 
-    // 模拟注册（实际应该调用 Supabase）
-    setTimeout(() => {
-      router.push('/dashboard')
-    }, 1000)
+    try {
+      const result = await signUp(email, password, name, role)
+
+      if (result.needsEmailConfirmation) {
+        alert('注册成功！请前往邮箱点击验证链接完成注册。')
+      } else {
+        alert('注册成功！正在跳转...')
+      }
+      router.push('/login')
+    } catch (err: any) {
+      console.error('注册错误:', err)
+      // 提供更友好的错误提示
+      if (err.message?.includes('already registered')) {
+        setError('该邮箱已被注册，请直接登录或使用其他邮箱')
+      } else if (err.message?.includes('Invalid email')) {
+        setError('请输入有效的邮箱地址')
+      } else if (err.message?.includes('Password')) {
+        setError('密码强度不够，请使用更复杂的密码')
+      } else {
+        setError(err.message || '注册失败，请稍后重试')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
