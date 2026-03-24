@@ -151,7 +151,7 @@ export async function getWrongQuestions() {
 }
 
 // 添加错题
-export async function addWrongQuestion(question: Omit<DbWrongQuestion, 'id' | 'created_at' | 'updated_at'>) {
+export async function addWrongQuestion(question: Omit<DbWrongQuestion, 'id' | 'created_at' | 'updated_at' | 'user_id'>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('未登录')
 
