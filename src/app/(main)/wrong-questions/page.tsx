@@ -46,7 +46,7 @@ export default function WrongQuestionsPage() {
   const [error, setError] = useState('')
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
   const [showDownloadModal, setShowDownloadModal] = useState(false)
-  const [downloadType, setDownloadType] = useState<'all' | 'subject' | 'mastery'>('all')
+  const [downloadType, setDownloadType] = useState<'all' | 'subject' | 'mastery' | 'subject-mastery'>('all')
   const [selectedSubject, setSelectedSubject] = useState('')
   const [selectedMastery, setSelectedMastery] = useState('')
 
