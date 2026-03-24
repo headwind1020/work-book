@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Card, CardContent, Button, Input } from '@/components/ui'
-import { Plus, Search, Lightbulb, TrendingUp, X, ArrowRight, ChevronRight } from 'lucide-react'
+import { Plus, Search, Lightbulb, TrendingUp, X, ArrowRight, ChevronRight, BookOpen, Sparkles } from 'lucide-react'
 import Link from 'next/link'
+import { debounce } from '@/lib/utils'
 
 // 知识点数据
 const knowledgePoints = [
@@ -88,9 +89,23 @@ const subjectColors: Record<string, string> = {
 }
 
 export default function KnowledgePage() {
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
+
+  // 防抖搜索
+  const debouncedSearch = useCallback(
+    debounce((value: string) => {
+      setSearch(value)
+    }, 300),
+    []
+  )
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value)
+    debouncedSearch(value)
+  }
 
   const filteredPoints = knowledgePoints.filter((point) =>
     point.name.toLowerCase().includes(search.toLowerCase())
@@ -144,8 +159,8 @@ export default function KnowledgePage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-light" />
             <input
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="搜索知识点..."
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-white text-text-primary placeholder:text-text-light focus:border-sky focus:ring-2 focus:ring-sky/20 transition-all"
             />
@@ -293,11 +308,32 @@ export default function KnowledgePage() {
       {/* 空状态 */}
       {filteredPoints.length === 0 && (
         <div className="text-center py-12">
-          <div className="w-16 h-16 bg-sky-light rounded-full flex items-center justify-center mx-auto mb-4">
-            <Lightbulb className="w-8 h-8 text-sky" />
-          </div>
-          <h3 className="text-lg font-medium text-text-primary mb-2">没有找到知识点</h3>
-          <p className="text-text-secondary">添加一个新的知识点吧</p>
+          {search ? (
+            <>
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="w-8 h-8 text-text-light" />
+              </div>
+              <h3 className="text-lg font-medium text-text-primary mb-2">没有找到相关知识点</h3>
+              <p className="text-text-secondary mb-4">试试其他关键词，或清除搜索</p>
+              <Button variant="outline" onClick={() => { setSearchInput(''); setSearch(''); }}>
+                清除搜索
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 bg-gradient-to-br from-sky/20 to-sunset-warm/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-10 h-10 text-sky" />
+              </div>
+              <h3 className="text-lg font-medium text-text-primary mb-2">还没有知识点</h3>
+              <p className="text-text-secondary mb-6">从添加错题开始，系统会自动为您整理知识点</p>
+              <Link href="/wrong-questions/new">
+                <Button className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  添加第一道错题
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       )}
     </div>

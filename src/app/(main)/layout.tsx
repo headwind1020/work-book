@@ -121,7 +121,7 @@ export default function MainLayout({
       {/* 遮罩层 */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-[9997] lg:hidden"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9997] lg:hidden animate-fade-in"
           onClick={() => setSidebarOpen(false)}
         />
       )}

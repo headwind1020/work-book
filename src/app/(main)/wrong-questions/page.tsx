@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, Button, Input, Select } from '@/components/ui'
-import { Plus, Search, ChevronRight, Trash2, Edit, Download, X, FileText } from 'lucide-react'
+import { Plus, Search, ChevronRight, Trash2, Edit, Download, X, FileText, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { getWrongQuestions, deleteWrongQuestion, DbWrongQuestion } from '@/lib/database'
+import { debounce } from '@/lib/utils'
 
 const subjects = [
   { value: '', label: '全部学科' },
@@ -24,8 +25,22 @@ const masteryOptions = [
 
 export default function WrongQuestionsPage() {
   const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [subject, setSubject] = useState('')
   const [mastery, setMastery] = useState('')
+
+  // 防抖搜索
+  const debouncedSearch = useCallback(
+    debounce((value: string) => {
+      setSearch(value)
+    }, 300),
+    []
+  )
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value)
+    debouncedSearch(value)
+  }
   const [questions, setQuestions] = useState<DbWrongQuestion[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -207,18 +222,21 @@ export default function WrongQuestionsPage() {
     setShowDownloadMenu(false)
   }
 
-  // 处理删除
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这道错题吗？')) return
-    try {
-      await deleteWrongQuestion(id)
-      setQuestions(questions.filter(q => q.id !== id))
-      alert('删除成功')
-    } catch (err) {
-      console.error('删除失败:', err)
-      alert('删除失败')
-    }
-  }
+  // 处理删除 - 带防抖防止重复点击
+  const handleDelete = useCallback(
+    debounce(async (id: string) => {
+      if (!confirm('确定要删除这道错题吗？')) return
+      try {
+        await deleteWrongQuestion(id)
+        setQuestions(questions.filter(q => q.id !== id))
+        alert('删除成功')
+      } catch (err) {
+        console.error('删除失败:', err)
+        alert('删除失败')
+      }
+    }, 500),
+    [questions]
+  )
 
   // 加载中
   if (loading) {
@@ -369,8 +387,8 @@ export default function WrongQuestionsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-light" />
             <input
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="搜索错题内容..."
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-white text-text-primary placeholder:text-text-light focus:border-sky focus:ring-2 focus:ring-sky/20 transition-all"
             />
@@ -441,20 +459,35 @@ export default function WrongQuestionsPage() {
       {/* 空状态 */}
       {filteredQuestions.length === 0 && (
         <div className="text-center py-12">
-          <div className="w-16 h-16 bg-sky-light rounded-full flex items-center justify-center mx-auto mb-4">
-            <Plus className="w-8 h-8 text-sky" />
-          </div>
-          <h3 className="text-lg font-medium text-text-primary mb-2">
-            {questions.length === 0 ? '还没有错题' : '没有找到错题'}
-          </h3>
-          <p className="text-text-secondary mb-4">
-            {questions.length === 0 ? '点击下方按钮添加第一道错题' : '调整筛选条件试试'}
-          </p>
-          {questions.length === 0 && (
-            <Link href="/wrong-questions/new">
-              <Button>添加错题</Button>
-            </Link>
-          )}
+          {questions.length === 0 ? (
+            <>
+              <div className="w-20 h-20 bg-gradient-to-br from-sky/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-10 h-10 text-sky" />
+              </div>
+              <h3 className="text-lg font-medium text-text-primary mb-2">还没有错题</h3>
+              <p className="text-text-secondary mb-6">将平时的错题记录在这里，系统会自动整理知识点</p>
+              <Link href="/wrong-questions/new">
+                <Button className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  添加第一道错题
+                </Button>
+              </Link>
+            </>
+          ) : search || subject || mastery ? (
+            <>
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="w-8 h-8 text-text-light" />
+              </div>
+              <h3 className="text-lg font-medium text-text-primary mb-2">没有找到匹配的错题</h3>
+              <p className="text-text-secondary mb-4">试试调整筛选条件</p>
+              <Button
+                variant="outline"
+                onClick={() => { setSearchInput(''); setSearch(''); setSubject(''); setMastery(''); }}
+              >
+                清除筛选条件
+              </Button>
+            </>
+          ) : null}
         </div>
       )}
 
