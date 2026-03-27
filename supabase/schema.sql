@@ -63,6 +63,26 @@ CREATE TABLE IF NOT EXISTS assessment_records (
   answered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 练习册表
+CREATE TABLE IF NOT EXISTS workbooks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  subject TEXT CHECK (subject IN ('chinese', 'math', 'english', 'physics', 'chemistry')),
+  question_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 练习册-错题关联表
+CREATE TABLE IF NOT EXISTS workbook_questions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workbook_id UUID REFERENCES workbooks(id) ON DELETE CASCADE,
+  question_id UUID REFERENCES wrong_questions(id) ON DELETE CASCADE,
+  added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 创建索引以提高查询性能
 CREATE INDEX IF NOT EXISTS idx_wrong_questions_user_id ON wrong_questions(user_id);
 CREATE INDEX IF NOT EXISTS idx_wrong_questions_subject ON wrong_questions(subject);
@@ -71,6 +91,8 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_points_user_id ON knowledge_points(user
 CREATE INDEX IF NOT EXISTS idx_knowledge_points_subject ON knowledge_points(subject);
 CREATE INDEX IF NOT EXISTS idx_assessment_records_user_id ON assessment_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_assessment_records_knowledge_point ON assessment_records(knowledge_point_id);
+CREATE INDEX IF NOT EXISTS idx_workbooks_user_id ON workbooks(user_id);
+CREATE INDEX IF NOT EXISTS idx_workbook_questions_workbook_id ON workbook_questions(workbook_id);
 
 -- 开启 RLS (Row Level Security)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -78,6 +100,8 @@ ALTER TABLE knowledge_points ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wrong_questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE question_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assessment_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workbooks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workbook_questions ENABLE ROW LEVEL SECURITY;
 
 -- RLS 策略：用户只能访问自己的数据
 CREATE POLICY "Users can view own data" ON users
@@ -127,6 +151,60 @@ CREATE POLICY "Assessment records are viewable by authenticated users" ON assess
 
 CREATE POLICY "Assessment records are insertable by authenticated users" ON assessment_records
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+-- 练习册 RLS 策略
+CREATE POLICY "Workbooks are viewable by authenticated users" ON workbooks
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Workbooks are insertable by authenticated users" ON workbooks
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Workbooks are updatable by authenticated users" ON workbooks
+  FOR UPDATE USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Workbooks are deletable by authenticated users" ON workbooks
+  FOR DELETE USING (auth.role() = 'authenticated');
+
+-- 练习册题目关联 RLS 策略
+CREATE POLICY "Workbook questions are viewable by authenticated users" ON workbook_questions
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Workbook questions are insertable by authenticated users" ON workbook_questions
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Workbook questions are deletable by authenticated users" ON workbook_questions
+  FOR DELETE USING (auth.role() = 'authenticated');
+
+-- 为 workbooks 表创建 updated_at 自动更新触发器
+CREATE TRIGGER update_workbooks_updated_at
+  BEFORE UPDATE ON workbooks
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- 练习册题目数量 RPC 函数
+CREATE OR REPLACE FUNCTION increment_workbook_count(workbook_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE workbooks
+  SET question_count = question_count + 1
+  WHERE id = workbook_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION decrement_workbook_count(workbook_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE workbooks
+  SET question_count = GREATEST(question_count - 1, 0)
+  WHERE id = workbook_id;
+END;
+$$;
 
 -- 创建自动更新 updated_at 的触发器函数
 CREATE OR REPLACE FUNCTION update_updated_at_column()
