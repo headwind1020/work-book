@@ -14,14 +14,18 @@ import {
   Menu,
   X,
   ChevronDown,
-  Brain
+  Brain,
+  FolderOpen,
+  Sparkles
 } from 'lucide-react'
 
 const navigation = [
   { name: '控制台', href: '/dashboard', icon: LayoutDashboard },
   { name: '错题管理', href: '/wrong-questions', icon: FileQuestion },
   { name: '知识点', href: '/knowledge', icon: Lightbulb },
+  { name: '练习册', href: '/workbook', icon: FolderOpen },
   { name: '智能评测', href: '/assessment', icon: Brain },
+  { name: 'AI 智能体', href: '/agent', icon: Sparkles },
   { name: '统计分析', href: '/statistics', icon: BarChart3 },
 ]
 

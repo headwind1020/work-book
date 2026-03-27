@@ -49,6 +49,24 @@ export interface DbAssessmentRecord {
   answered_at: string
 }
 
+export interface DbWorkbook {
+  id: string
+  user_id: string
+  name: string
+  description?: string
+  subject?: string
+  question_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DbWorkbookQuestion {
+  id: string
+  workbook_id: string
+  question_id: string
+  added_at: string
+}
+
 // ============ 用户相关 ============
 
 // 注册新用户
@@ -271,4 +289,117 @@ export async function getUserStats() {
     subjectStats,
     masteryStats,
   }
+}
+
+// ============ 练习册相关 ============
+
+// 获取当前用户的练习册
+export async function getWorkbooks() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+
+  const { data, error } = await supabase
+    .from('workbooks')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data as DbWorkbook[]
+}
+
+// 获取单个练习册
+export async function getWorkbookById(id: string) {
+  const { data, error } = await supabase
+    .from('workbooks')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return data as DbWorkbook
+}
+
+// 创建练习册
+export async function createWorkbook(workbook: Omit<DbWorkbook, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'question_count'>) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+
+  const { data, error } = await supabase
+    .from('workbooks')
+    .insert([{ ...workbook, user_id: user.id, question_count: 0 }])
+    .select()
+
+  if (error) throw error
+  return data[0] as DbWorkbook
+}
+
+// 更新练习册
+export async function updateWorkbook(id: string, updates: Partial<DbWorkbook>) {
+  const { data, error } = await supabase
+    .from('workbooks')
+    .update(updates)
+    .eq('id', id)
+    .select()
+
+  if (error) throw error
+  return data[0] as DbWorkbook
+}
+
+// 删除练习册
+export async function deleteWorkbook(id: string) {
+  const { error } = await supabase
+    .from('workbooks')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+// 获取练习册中的题目
+export async function getWorkbookQuestions(workbookId: string) {
+  const { data, error } = await supabase
+    .from('workbook_questions')
+    .select('*')
+    .eq('workbook_id', workbookId)
+    .order('added_at', { ascending: false })
+
+  if (error) throw error
+  return data as DbWorkbookQuestion[]
+}
+
+// 添加题目到练习册
+export async function addQuestionToWorkbook(workbookId: string, questionId: string) {
+  const { data, error } = await supabase
+    .from('workbook_questions')
+    .insert([{ workbook_id: workbookId, question_id: questionId }])
+    .select()
+
+  if (error) throw error
+
+  // 更新练习册题目数量
+  const workbook = await getWorkbookById(workbookId)
+  await supabase
+    .from('workbooks')
+    .update({ question_count: workbook.question_count + 1 })
+    .eq('id', workbookId)
+
+  return data[0] as DbWorkbookQuestion
+}
+
+// 从练习册移除题目
+export async function removeQuestionFromWorkbook(workbookId: string, questionId: string) {
+  const { error } = await supabase
+    .from('workbook_questions')
+    .delete()
+    .eq('workbook_id', workbookId)
+    .eq('question_id', questionId)
+
+  if (error) throw error
+
+  // 更新练习册题目数量
+  const workbook = await getWorkbookById(workbookId)
+  await supabase
+    .from('workbooks')
+    .update({ question_count: Math.max(workbook.question_count - 1, 0) })
+    .eq('id', workbookId)
 }
