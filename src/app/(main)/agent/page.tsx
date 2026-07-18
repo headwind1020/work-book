@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Sparkles, Send, Bot, User, Trash2, Lightbulb, FileQuestion, BookOpen, ChevronDown } from 'lucide-react'
+import { Sparkles, Send, Bot, User, Trash2, Lightbulb, FileQuestion, ChevronDown } from 'lucide-react'
 import { getWrongQuestions, getKnowledgePoints, DbWrongQuestion, DbKnowledgePoint } from '@/lib/database'
 
 interface Message {
@@ -11,12 +11,40 @@ interface Message {
   timestamp: Date
 }
 
-const systemPrompt = `你是智能错题簿的 AI 助手，专门帮助学生学习。你有以下能力：
+const baseSystemPrompt = `你是智能错题簿的 AI 助手，专门帮助学生学习。你有以下能力：
 1. 错题分析 - 分析学生的错题，提供详细的解题思路和错误原因分析
 2. 学习建议 - 根据学生的错题历史和知识点掌握情况，提供个性化的学习建议
 3. 知识答疑 - 回答学生在学习中遇到的问题
 
 请用友好、专业的语气回答问题，尽可能提供详细和有用的信息。`
+
+function buildContextPrompt(
+  questions: DbWrongQuestion[],
+  points: DbKnowledgePoint[]
+): string {
+  const lines: string[] = [baseSystemPrompt, '']
+
+  if (questions.length > 0) {
+    lines.push('## 学生最近的错题（最多 5 条）')
+    questions.slice(0, 5).forEach((q, i) => {
+      lines.push(`${i + 1}. [${q.subject}] ${q.content}`)
+      lines.push(`   正确答案: ${q.correct_answer}`)
+      if (q.error_reason) lines.push(`   错误原因: ${q.error_reason}`)
+      if (q.analysis) lines.push(`   解析: ${q.analysis}`)
+    })
+    lines.push('')
+  }
+
+  if (points.length > 0) {
+    lines.push('## 学生的知识点掌握情况')
+    points.forEach((p, i) => {
+      lines.push(`${i + 1}. [${p.subject}] ${p.name} - 掌握程度: ${p.mastery_level}`)
+    })
+    lines.push('')
+  }
+
+  return lines.join('\n')
+}
 
 export default function AgentPage() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -67,8 +95,9 @@ export default function AgentPage() {
     setLoading(true)
 
     try {
+      const systemWithContext = buildContextPrompt(wrongQuestions, knowledgePoints)
       const contextMessages = [
-        { role: 'system' as const, content: systemPrompt },
+        { role: 'system' as const, content: systemWithContext },
         ...messages.slice(-10).map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
         { role: 'user' as const, content: userMessage.content },
       ]
@@ -92,12 +121,13 @@ export default function AgentPage() {
       }
 
       setMessages((prev) => [...prev, assistantMessage])
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('发送消息失败:', error)
+      const message = error instanceof Error ? error.message : String(error)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: error?.response?.data?.error || error.message || '抱歉，发生了错误，请稍后重试。',
+        content: message || '抱歉，发生了错误，请稍后重试。',
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
