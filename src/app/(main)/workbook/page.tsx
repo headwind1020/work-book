@@ -4,14 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { FolderOpen, Plus, BookOpen, Clock, Trash2 } from 'lucide-react'
 import { getWorkbooks, deleteWorkbook, DbWorkbook } from '@/lib/database'
-
-const subjectMap: Record<string, string> = {
-  chinese: '语文',
-  math: '数学',
-  english: '英语',
-  physics: '物理',
-  chemistry: '化学',
-}
+import { subjectLabels } from '@/lib/supabase'
 
 export default function WorkbookPage() {
   const [workbooks, setWorkbooks] = useState<DbWorkbook[]>([])
@@ -118,7 +111,7 @@ export default function WorkbookPage() {
                 <div className="flex items-center gap-4">
                   {workbook.subject && (
                     <span className="px-2 py-1 bg-sky/10 text-sky rounded-lg text-xs font-medium">
-                      {subjectMap[workbook.subject] || workbook.subject}
+                      {subjectLabels[workbook.subject as keyof typeof subjectLabels] || workbook.subject}
                     </span>
                   )}
                   <span className="text-text-secondary flex items-center gap-1">

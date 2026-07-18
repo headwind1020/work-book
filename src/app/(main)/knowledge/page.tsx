@@ -12,42 +12,13 @@ import {
   DbKnowledgePoint,
   DbWrongQuestion,
 } from '@/lib/database'
-
-const subjectColors: Record<string, string> = {
-  chinese: 'bg-red-500',
-  math: 'bg-blue-500',
-  english: 'bg-purple-500',
-  physics: 'bg-teal-500',
-  chemistry: 'bg-yellow-500',
-}
-
-const subjectLabels: Record<string, string> = {
-  chinese: '语文',
-  math: '数学',
-  english: '英语',
-  physics: '物理',
-  chemistry: '化学',
-}
-
-const masteryLabels: Record<string, string> = {
-  unfamiliar: '不熟悉',
-  normal: '一般',
-  mastered: '已掌握',
-}
-
-const masteryColors: Record<string, string> = {
-  unfamiliar: 'bg-red-100 text-red-600',
-  normal: 'bg-yellow-100 text-yellow-600',
-  mastered: 'bg-green-100 text-green-600',
-}
-
-const subjectOptions = [
-  { value: 'math', label: '数学' },
-  { value: 'physics', label: '物理' },
-  { value: 'english', label: '英语' },
-  { value: 'chinese', label: '语文' },
-  { value: 'chemistry', label: '化学' },
-]
+import {
+  subjectColors,
+  subjectLabels,
+  masteryLabels,
+  masteryColorsSoft,
+} from '@/lib/supabase'
+import { subjectOptions } from '@/lib/constants'
 
 export default function KnowledgePage() {
   const [searchInput, setSearchInput] = useState('')
@@ -197,12 +168,12 @@ export default function KnowledgePage() {
             <div className="p-4">
               <div className="flex items-start justify-between">
                 <div
-                  className={`${subjectColors[point.subject] || 'bg-gray-500'} w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0`}
+                  className={`${subjectColors[point.subject as keyof typeof subjectColors] || 'bg-gray-500'} w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0`}
                 >
                   <Lightbulb className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-xs text-text-light bg-gray-100 px-2 py-1 rounded-full">
-                  {subjectLabels[point.subject] || point.subject}
+                  {subjectLabels[point.subject as keyof typeof subjectLabels] || point.subject}
                 </span>
               </div>
               <h3 className="font-medium text-text-primary mt-3">{point.name}</h3>
@@ -233,7 +204,7 @@ export default function KnowledgePage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div
-              className={`${subjectColors[getSelectedPoint()!.subject] || 'bg-gray-500'} p-6 text-white flex-shrink-0`}
+              className={`${subjectColors[getSelectedPoint()!.subject as keyof typeof subjectColors] || 'bg-gray-500'} p-6 text-white flex-shrink-0`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -241,7 +212,7 @@ export default function KnowledgePage() {
                   <div>
                     <h3 className="text-xl font-bold">{getSelectedPoint()!.name}</h3>
                     <p className="text-sm opacity-80">
-                      {subjectLabels[getSelectedPoint()!.subject] || getSelectedPoint()!.subject}
+                      {subjectLabels[getSelectedPoint()!.subject as keyof typeof subjectLabels] || getSelectedPoint()!.subject}
                     </p>
                   </div>
                 </div>
@@ -285,9 +256,9 @@ export default function KnowledgePage() {
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${masteryColors[q.mastery_level] || ''}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${masteryColorsSoft[q.mastery_level as keyof typeof masteryColorsSoft] || ''}`}
                         >
-                          {masteryLabels[q.mastery_level] || q.mastery_level}
+                          {masteryLabels[q.mastery_level as keyof typeof masteryLabels] || q.mastery_level}
                         </span>
                         <ChevronRight className="w-4 h-4 text-text-light" />
                       </div>

@@ -6,12 +6,7 @@ import Link from 'next/link'
 import { CloudBackground, Button } from '@/components/ui'
 import { BookOpen, Mail, Lock, User, ArrowRight, GraduationCap } from 'lucide-react'
 import { signUp } from '@/lib/database'
-
-const roleOptions = [
-  { value: 'student', label: '学生' },
-  { value: 'teacher', label: '老师' },
-  { value: 'parent', label: '家长' },
-]
+import { roleOptions } from '@/lib/constants'
 
 export default function RegisterPage() {
   const router = useRouter()

@@ -4,15 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, BookOpen, Check } from 'lucide-react'
 import { createWorkbook } from '@/lib/database'
-
-const subjectOptions = [
-  { value: '', label: '选择学科（可选）' },
-  { value: 'chinese', label: '语文' },
-  { value: 'math', label: '数学' },
-  { value: 'english', label: '英语' },
-  { value: 'physics', label: '物理' },
-  { value: 'chemistry', label: '化学' },
-]
+import { subjectFilterOptions } from '@/lib/constants'
 
 export default function NewWorkbookPage() {
   const router = useRouter()
@@ -98,7 +90,7 @@ export default function NewWorkbookPage() {
               onChange={(e) => setSubject(e.target.value)}
               className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sky/20 focus:border-sky bg-white"
             >
-              {subjectOptions.map((option) => (
+              {subjectFilterOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

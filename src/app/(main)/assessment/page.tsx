@@ -18,6 +18,7 @@ import {
   Zap
 } from 'lucide-react'
 import { addAssessmentRecord } from '@/lib/database'
+import { masteryLabels, masteryColorsSolid } from '@/lib/supabase'
 
 const mockKnowledgePoints = [
   { id: '1', subject: 'math', name: '二次函数', totalQuestions: 15, correctCount: 8, masteryLevel: 'normal' as MasteryLevel },
@@ -64,22 +65,11 @@ const generateQuestions = (knowledgePointId: string): AssessmentQuestion[] => {
   return questionBanks[knowledgePointId] || questionBanks['1']
 }
 
-const getMasteryColor = (level: MasteryLevel) => {
-  switch (level) {
-    case 'mastered': return 'bg-green-500'
-    case 'normal': return 'bg-yellow-500'
-    case 'unfamiliar': return 'bg-red-500'
-    default: return 'bg-gray-500'
-  }
-}
+const getMasteryColor = (level: MasteryLevel) =>
+  masteryColorsSolid[level] || 'bg-gray-500'
 
-const getMasteryLabel = (level: MasteryLevel) => {
-  switch (level) {
-    case 'mastered': return '已掌握'
-    case 'normal': return '一般'
-    case 'unfamiliar': return '不熟悉'
-  }
-}
+const getMasteryLabel = (level: MasteryLevel) =>
+  masteryLabels[level] || level
 
 export default function AssessmentPage() {
   const [view, setView] = useState<'select' | 'testing' | 'result'>('select')

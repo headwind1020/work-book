@@ -4,34 +4,12 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui'
 import { BarChart3, TrendingUp, Target, Clock } from 'lucide-react'
 import { getUserStats, getWeeklyStats, UserStats, WeeklyStat } from '@/lib/database'
-
-const subjectLabels: Record<string, string> = {
-  chinese: '语文',
-  math: '数学',
-  english: '英语',
-  physics: '物理',
-  chemistry: '化学',
-}
-
-const subjectColors: Record<string, string> = {
-  chinese: 'bg-red-500',
-  math: 'bg-blue-500',
-  english: 'bg-purple-500',
-  physics: 'bg-teal-500',
-  chemistry: 'bg-yellow-500',
-}
-
-const masteryLabels: Record<string, string> = {
-  unfamiliar: '不熟悉',
-  normal: '一般',
-  mastered: '已掌握',
-}
-
-const masteryColors: Record<string, string> = {
-  unfamiliar: 'bg-red-500',
-  normal: 'bg-yellow-500',
-  mastered: 'bg-green-500',
-}
+import {
+  subjectLabels,
+  subjectColors,
+  masteryLabels,
+  masteryColorsSolid,
+} from '@/lib/supabase'
 
 export default function StatisticsPage() {
   const [stats, setStats] = useState<UserStats | null>(null)
@@ -154,13 +132,13 @@ export default function StatisticsPage() {
                 <div key={subject}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium text-text-primary">
-                      {subjectLabels[subject] || subject}
+                      {subjectLabels[subject as keyof typeof subjectLabels] || subject}
                     </span>
                     <span className="text-sm text-text-secondary">{count} 题</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className={`h-full ${subjectColors[subject] || 'bg-gray-500'} rounded-full transition-all duration-500`}
+                      className={`h-full ${subjectColors[subject as keyof typeof subjectColors] || 'bg-gray-500'} rounded-full transition-all duration-500`}
                       style={{ width: `${subjectTotal ? (count / subjectTotal) * 100 : 0}%` }}
                     />
                   </div>
@@ -182,13 +160,13 @@ export default function StatisticsPage() {
                 <div key={level}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium text-text-primary">
-                      {masteryLabels[level] || level}
+                      {masteryLabels[level as keyof typeof masteryLabels] || level}
                     </span>
                     <span className="text-sm text-text-secondary">{count} 题</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className={`h-full ${masteryColors[level] || 'bg-gray-500'} rounded-full transition-all duration-500`}
+                      className={`h-full ${masteryColorsSolid[level as keyof typeof masteryColorsSolid] || 'bg-gray-500'} rounded-full transition-all duration-500`}
                       style={{ width: `${masteryTotal ? (count / masteryTotal) * 100 : 0}%` }}
                     />
                   </div>

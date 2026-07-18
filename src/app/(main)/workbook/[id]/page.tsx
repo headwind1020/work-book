@@ -15,26 +15,11 @@ import {
   DbWorkbookQuestion
 } from '@/lib/database'
 import { useParams } from 'next/navigation'
-
-const subjectMap: Record<string, string> = {
-  chinese: '语文',
-  math: '数学',
-  english: '英语',
-  physics: '物理',
-  chemistry: '化学',
-}
-
-const difficultyMap: Record<string, string> = {
-  easy: '简单',
-  medium: '中等',
-  hard: '困难',
-}
-
-const masteryMap: Record<string, string> = {
-  unfamiliar: '不熟悉',
-  normal: '一般',
-  mastered: '已掌握',
-}
+import {
+  subjectLabels,
+  difficultyLabels,
+  masteryLabels,
+} from '@/lib/supabase'
 
 export default function WorkbookDetailPage() {
   const router = useRouter()
@@ -187,7 +172,7 @@ export default function WorkbookDetailPage() {
               <div className="flex items-center gap-3 mt-2">
                 {workbook.subject && (
                   <span className="px-2 py-1 bg-sky/10 text-sky rounded-lg text-sm font-medium">
-                    {subjectMap[workbook.subject] || workbook.subject}
+                    {subjectLabels[workbook.subject as keyof typeof subjectLabels] || workbook.subject}
                   </span>
                 )}
                 <span className="text-text-secondary text-sm">
@@ -239,15 +224,15 @@ export default function WorkbookDetailPage() {
                   </p>
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     <span className="px-2 py-0.5 bg-sky/10 text-sky rounded text-xs">
-                      {subjectMap[question.subject] || question.subject}
+                            {subjectLabels[question.subject as keyof typeof subjectLabels] || question.subject}
                     </span>
                     {question.difficulty && (
                       <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
-                        {difficultyMap[question.difficulty] || question.difficulty}
+                        {difficultyLabels[question.difficulty as keyof typeof difficultyLabels] || question.difficulty}
                       </span>
                     )}
                     <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs">
-                      {masteryMap[question.mastery_level] || question.mastery_level}
+                      {masteryLabels[question.mastery_level as keyof typeof masteryLabels] || question.mastery_level}
                     </span>
                   </div>
                 </div>
@@ -292,7 +277,7 @@ export default function WorkbookDetailPage() {
                         <p className="text-text-primary line-clamp-2">{question.content}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="px-2 py-0.5 bg-sky/10 text-sky rounded text-xs">
-                            {subjectMap[question.subject] || question.subject}
+                      {subjectLabels[question.subject as keyof typeof subjectLabels] || question.subject}
                           </span>
                         </div>
                       </div>

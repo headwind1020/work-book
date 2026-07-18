@@ -11,27 +11,13 @@ import {
   deleteWrongQuestion,
   DbWrongQuestion,
 } from '@/lib/database'
+import { subjectColors, subjectLabels, masteryLabels } from '@/lib/supabase'
+import type { MasteryLevel } from '@/lib/supabase'
 
-const subjectColors: Record<string, string> = {
-  chinese: 'bg-red-500',
-  math: 'bg-blue-500',
-  english: 'bg-purple-500',
-  physics: 'bg-teal-500',
-  chemistry: 'bg-yellow-500',
-}
-
-const subjectLabels: Record<string, string> = {
-  chinese: '语文',
-  math: '数学',
-  english: '英语',
-  physics: '物理',
-  chemistry: '化学',
-}
-
-const masteryOptions = [
-  { value: 'unfamiliar', label: '不熟悉' },
-  { value: 'normal', label: '一般' },
-  { value: 'mastered', label: '已掌握' },
+const masteryOptions: { value: MasteryLevel; label: string }[] = [
+  { value: 'unfamiliar', label: masteryLabels.unfamiliar },
+  { value: 'normal', label: masteryLabels.normal },
+  { value: 'mastered', label: masteryLabels.mastered },
 ]
 
 export default function WrongQuestionDetailPage() {
@@ -131,8 +117,8 @@ export default function WrongQuestionDetailPage() {
     )
   }
 
-  const subjectColor = subjectColors[question.subject] || 'bg-gray-500'
-  const subjectName = subjectLabels[question.subject] || question.subject
+  const subjectColor = subjectColors[question.subject as keyof typeof subjectColors] || 'bg-gray-500'
+  const subjectName = subjectLabels[question.subject as keyof typeof subjectLabels] || question.subject
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">

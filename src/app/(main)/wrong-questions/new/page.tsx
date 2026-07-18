@@ -6,27 +6,11 @@ import { ArrowLeft, Save, Camera, Keyboard, Upload, X, Sparkles } from 'lucide-r
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { addWrongQuestion } from '@/lib/database'
-
-const subjectOptions = [
-  { value: 'math', label: '数学' },
-  { value: 'physics', label: '物理' },
-  { value: 'english', label: '英语' },
-  { value: 'chinese', label: '语文' },
-  { value: 'chemistry', label: '化学' },
-]
-
-const questionTypeOptions = [
-  { value: 'choice', label: '选择题' },
-  { value: 'fill', label: '填空题' },
-  { value: 'judge', label: '判断题' },
-  { value: 'answer', label: '解答题' },
-]
-
-const difficultyOptions = [
-  { value: 'easy', label: '简单' },
-  { value: 'medium', label: '中等' },
-  { value: 'hard', label: '困难' },
-]
+import {
+  subjectOptions,
+  difficultyOptions,
+  questionTypeOptions,
+} from '@/lib/constants'
 
 export default function NewWrongQuestionPage() {
   const router = useRouter()

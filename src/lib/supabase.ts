@@ -111,6 +111,19 @@ export const masteryLabels: Record<MasteryLevel, string> = {
   mastered: '已掌握',
 }
 
+// 掌握程度颜色（soft：用于徽章/标签背景；solid：用于图标/进度条）
+export const masteryColorsSolid: Record<MasteryLevel, string> = {
+  unfamiliar: 'bg-red-500',
+  normal: 'bg-yellow-500',
+  mastered: 'bg-green-500',
+}
+
+export const masteryColorsSoft: Record<MasteryLevel, string> = {
+  unfamiliar: 'bg-red-100 text-red-600',
+  normal: 'bg-yellow-100 text-yellow-600',
+  mastered: 'bg-green-100 text-green-600',
+}
+
 // 难度标签
 export const difficultyLabels: Record<Difficulty, string> = {
   easy: '简单',

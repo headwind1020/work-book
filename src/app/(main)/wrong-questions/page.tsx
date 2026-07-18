@@ -6,22 +6,16 @@ import { Plus, Search, ChevronRight, Trash2, Download, X, FileText, Sparkles } f
 import Link from 'next/link'
 import { getWrongQuestions, deleteWrongQuestion, DbWrongQuestion } from '@/lib/database'
 import { debounce } from '@/lib/utils'
-
-const subjects = [
-  { value: '', label: '全部学科' },
-  { value: 'chinese', label: '语文' },
-  { value: 'math', label: '数学' },
-  { value: 'english', label: '英语' },
-  { value: 'physics', label: '物理' },
-  { value: 'chemistry', label: '化学' },
-]
-
-const masteryOptions = [
-  { value: '', label: '全部掌握程度' },
-  { value: 'unfamiliar', label: '不熟悉' },
-  { value: 'normal', label: '一般' },
-  { value: 'mastered', label: '已掌握' },
-]
+import {
+  subjectColors,
+  subjectLabels,
+  masteryLabels,
+  masteryColorsSoft,
+} from '@/lib/supabase'
+import {
+  subjectFilterOptions,
+  masteryFilterOptions,
+} from '@/lib/constants'
 
 export default function WrongQuestionsPage() {
   const [search, setSearch] = useState('')
@@ -77,45 +71,17 @@ export default function WrongQuestionsPage() {
     }
   }
 
-  const getSubjectColor = (key: string) => {
-    const colors: Record<string, string> = {
-      chinese: 'bg-red-500',
-      math: 'bg-blue-500',
-      english: 'bg-purple-500',
-      physics: 'bg-teal-500',
-      chemistry: 'bg-yellow-500',
-    }
-    return colors[key] || 'bg-gray-500'
-  }
+  const getSubjectColor = (key: string) =>
+    subjectColors[key as keyof typeof subjectColors] || 'bg-gray-500'
 
-  const getSubjectLabel = (key: string) => {
-    const labels: Record<string, string> = {
-      chinese: '语文',
-      math: '数学',
-      english: '英语',
-      physics: '物理',
-      chemistry: '化学',
-    }
-    return labels[key] || key
-  }
+  const getSubjectLabel = (key: string) =>
+    subjectLabels[key as keyof typeof subjectLabels] || key
 
-  const getMasteryColor = (level: string) => {
-    const colors: Record<string, string> = {
-      unfamiliar: 'bg-red-100 text-red-600',
-      normal: 'bg-yellow-100 text-yellow-600',
-      mastered: 'bg-green-100 text-green-600',
-    }
-    return colors[level] || 'bg-gray-100 text-gray-600'
-  }
+  const getMasteryColor = (level: string) =>
+    masteryColorsSoft[level as keyof typeof masteryColorsSoft] || 'bg-gray-100 text-gray-600'
 
-  const getMasteryLabel = (level: string) => {
-    const labels: Record<string, string> = {
-      unfamiliar: '不熟悉',
-      normal: '一般',
-      mastered: '已掌握',
-    }
-    return labels[level] || level
-  }
+  const getMasteryLabel = (level: string) =>
+    masteryLabels[level as keyof typeof masteryLabels] || level
 
   // 筛选题目
   const filteredQuestions = questions.filter((q) => {
@@ -403,7 +369,7 @@ export default function WrongQuestionsPage() {
 
           {/* 学科筛选 */}
           <Select
-            options={subjects}
+            options={subjectFilterOptions}
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             className="w-full lg:w-40"
@@ -411,7 +377,7 @@ export default function WrongQuestionsPage() {
 
           {/* 掌握程度筛选 */}
           <Select
-            options={masteryOptions}
+            options={masteryFilterOptions}
             value={mastery}
             onChange={(e) => setMastery(e.target.value)}
             className="w-full lg:w-40"

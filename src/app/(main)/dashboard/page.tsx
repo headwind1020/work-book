@@ -22,24 +22,9 @@ import {
   WeakPoint,
 } from '@/lib/database'
 import type { DbWrongQuestion } from '@/lib/database'
+import { subjectLabels, subjectColors } from '@/lib/supabase'
 
 type StatType = 'total' | 'knowledge' | 'weekly' | 'mastered'
-
-const subjectLabels: Record<string, string> = {
-  chinese: '语文',
-  math: '数学',
-  english: '英语',
-  physics: '物理',
-  chemistry: '化学',
-}
-
-const subjectColorsText: Record<string, string> = {
-  chinese: 'bg-red-500',
-  math: 'bg-blue-500',
-  english: 'bg-purple-500',
-  physics: 'bg-teal-500',
-  chemistry: 'bg-yellow-500',
-}
 
 export default function DashboardPage() {
   const [selectedStat, setSelectedStat] = useState<StatType | null>(null)
@@ -114,14 +99,20 @@ export default function DashboardPage() {
       const subjects = Object.entries(stats.subjectStats).sort((a, b) => b[1] - a[1])
       return {
         title: '总错题详情',
-        items: subjects.map(([k, v]) => ({ label: subjectLabels[k] || k, value: String(v) })),
+        items: subjects.map(([k, v]) => ({
+          label: subjectLabels[k as keyof typeof subjectLabels] || k,
+          value: String(v),
+        })),
       }
     }
     if (selectedStat === 'knowledge') {
       const subjects = Object.entries(stats.subjectStats).sort((a, b) => b[1] - a[1])
       return {
         title: '学科分布',
-        items: subjects.map(([k, v]) => ({ label: subjectLabels[k] || k, value: `${v} 题` })),
+        items: subjects.map(([k, v]) => ({
+          label: subjectLabels[k as keyof typeof subjectLabels] || k,
+          value: `${v} 题`,
+        })),
       }
     }
     if (selectedStat === 'weekly') {
@@ -208,9 +199,9 @@ export default function DashboardPage() {
                   className="flex items-center gap-4 py-3 hover:bg-sky-light/50 rounded-lg px-2 -mx-2 transition-colors"
                 >
                   <div
-                    className={`${subjectColorsText[q.subject] || 'bg-gray-500'} w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-medium`}
+                    className={`${subjectColors[q.subject as keyof typeof subjectColors] || 'bg-gray-500'} w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-medium`}
                   >
-                    {(subjectLabels[q.subject] || q.subject)[0]}
+                    {(subjectLabels[q.subject as keyof typeof subjectLabels] || q.subject)[0]}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-text-primary truncate">{q.content}</p>
