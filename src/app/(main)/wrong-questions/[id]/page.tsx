@@ -1,103 +1,116 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, Button } from '@/components/ui'
-import { ArrowLeft, CheckCircle, Edit, Trash2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Save } from 'lucide-react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
+import {
+  getWrongQuestionById,
+  updateWrongQuestion,
+  deleteWrongQuestion,
+  DbWrongQuestion,
+} from '@/lib/database'
 
-// 模拟错题数据库
-const questionsDatabase: Record<string, {
-  id: string
-  subject: string
-  subjectName: string
-  subjectColor: string
-  knowledgePoint: string
-  type: string
-  content: string
-  options?: string[]
-  correctAnswer: string
-  explanation: string
-  mastery: string
-  createdAt: string
-}> = {
-  '1': {
-    id: '1',
-    subject: 'math',
-    subjectName: '数学',
-    subjectColor: 'bg-blue-500',
-    knowledgePoint: '二次函数',
-    type: 'choice',
-    content: '已知二次函数 y = ax² + bx + c 的图像开口向下，且与 x 轴交于点 (1, 0) 和 (-1, 0)，则下列结论正确的是？',
-    options: ['a > 0', 'a < 0', 'c = 0', 'b = 0'],
-    correctAnswer: 'a < 0',
-    explanation: '因为图像开口向下，所以 a < 0；又因为与 x 轴交于 (1, 0) 和 (-1, 0)，代入可得 a + b + c = 0 和 a - b + c = 0，两式相减得 b = 0，两式相加得 c = -a ≠ 0。所以正确答案是 a < 0。',
-    mastery: 'unfamiliar',
-    createdAt: '2024-01-15',
-  },
-  '2': {
-    id: '2',
-    subject: 'physics',
-    subjectName: '物理',
-    subjectColor: 'bg-teal-500',
-    knowledgePoint: '自由落体',
-    type: 'choice',
-    content: '一物体从高度 h = 20m 处自由下落，不计空气阻力，求落地时的速度。(g = 10m/s²)',
-    options: ['10m/s', '15m/s', '20m/s', '25m/s'],
-    correctAnswer: '20m/s',
-    explanation: '根据自由落体运动公式 v² = 2gh，代入 v² = 2 × 10 × 20 = 400，所以 v = 20m/s。',
-    mastery: 'normal',
-    createdAt: '2024-01-14',
-  },
-  '3': {
-    id: '3',
-    subject: 'english',
-    subjectName: '英语',
-    subjectColor: 'bg-purple-500',
-    knowledgePoint: '时态',
-    type: 'choice',
-    content: 'The weather ___ fine tomorrow. (is / will be / was / are)',
-    options: ['is', 'will be', 'was', 'are'],
-    correctAnswer: 'will be',
-    explanation: 'tomorrow 表示将来时间，需要用一般将来时 will be。',
-    mastery: 'mastered',
-    createdAt: '2024-01-13',
-  },
-  '4': {
-    id: '4',
-    subject: 'chemistry',
-    subjectName: '化学',
-    subjectColor: 'bg-yellow-500',
-    knowledgePoint: '氧气',
-    type: 'fill',
-    content: '写出实验室制取氧气的化学方程式。',
-    correctAnswer: '2KClO3 = 2KCl + 3O2↑ (加热)',
-    explanation: '实验室常用氯酸钾加热制取氧气，反应需要二氧化锰作催化剂。',
-    mastery: 'normal',
-    createdAt: '2024-01-12',
-  },
-  '5': {
-    id: '5',
-    subject: 'chinese',
-    subjectName: '语文',
-    subjectColor: 'bg-red-500',
-    knowledgePoint: '论语',
-    type: 'fill',
-    content: '解释下列加点字的含义：温故而知新',
-    correctAnswer: '故：旧的知识；新：新的理解',
-    explanation: '这句话出自《论语》，意思是：复习旧的知识，从而获得新的理解和体会。',
-    mastery: 'unfamiliar',
-    createdAt: '2024-01-11',
-  },
+const subjectColors: Record<string, string> = {
+  chinese: 'bg-red-500',
+  math: 'bg-blue-500',
+  english: 'bg-purple-500',
+  physics: 'bg-teal-500',
+  chemistry: 'bg-yellow-500',
 }
+
+const subjectLabels: Record<string, string> = {
+  chinese: '语文',
+  math: '数学',
+  english: '英语',
+  physics: '物理',
+  chemistry: '化学',
+}
+
+const masteryOptions = [
+  { value: 'unfamiliar', label: '不熟悉' },
+  { value: 'normal', label: '一般' },
+  { value: 'mastered', label: '已掌握' },
+]
 
 export default function WrongQuestionDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const questionId = params.id as string
-  const question = questionsDatabase[questionId]
-  const [mastery, setMastery] = useState(question?.mastery || 'unfamiliar')
 
-  if (!question) {
+  const [question, setQuestion] = useState<DbWrongQuestion | null>(null)
+  const [mastery, setMastery] = useState<string>('unfamiliar')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState('')
+  const [saveMessage, setSaveMessage] = useState('')
+
+  useEffect(() => {
+    if (questionId) {
+      loadQuestion()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionId])
+
+  const loadQuestion = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      const data = await getWrongQuestionById(questionId)
+      setQuestion(data)
+      setMastery(data.mastery_level || 'unfamiliar')
+    } catch (err: unknown) {
+      console.error('加载错题失败:', err)
+      setError('加载失败，该错题可能已被删除')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveMastery = async () => {
+    if (!question) return
+    try {
+      setSaving(true)
+      setSaveMessage('')
+      await updateWrongQuestion(question.id, { mastery_level: mastery })
+      setSaveMessage('已保存')
+      setTimeout(() => setSaveMessage(''), 2000)
+    } catch (err: unknown) {
+      console.error('保存失败:', err)
+      setSaveMessage('保存失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!question) return
+    if (!confirm('确定要删除这道错题吗？')) return
+    try {
+      setDeleting(true)
+      await deleteWrongQuestion(question.id)
+      router.push('/wrong-questions')
+    } catch (err: unknown) {
+      console.error('删除失败:', err)
+      alert('删除失败')
+      setDeleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
+        <div className="text-center py-12">
+          <div className="w-8 h-8 border-4 border-sky border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-text-secondary">加载中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !question) {
     return (
       <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
         <div className="flex items-center gap-4">
@@ -108,9 +121,9 @@ export default function WrongQuestionDetailPage() {
         </div>
         <Card>
           <CardContent className="p-6 text-center">
-            <p className="text-text-secondary">未找到该错题，可能已被删除。</p>
+            <p className="text-text-secondary mb-4">{error || '未找到该错题'}</p>
             <Link href="/wrong-questions">
-              <Button className="mt-4">返回错题列表</Button>
+              <Button>返回错题列表</Button>
             </Link>
           </CardContent>
         </Card>
@@ -118,11 +131,8 @@ export default function WrongQuestionDetailPage() {
     )
   }
 
-  const masteryOptions = [
-    { value: 'unfamiliar', label: '不熟悉', color: 'text-red-500' },
-    { value: 'normal', label: '一般', color: 'text-yellow-500' },
-    { value: 'mastered', label: '已掌握', color: 'text-green-500' },
-  ]
+  const subjectColor = subjectColors[question.subject] || 'bg-gray-500'
+  const subjectName = subjectLabels[question.subject] || question.subject
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
@@ -135,74 +145,112 @@ export default function WrongQuestionDetailPage() {
 
       <Card>
         <CardContent className="p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <span className={`px-3 py-1 ${question.subjectColor} text-white text-sm rounded-full`}>
-              {question.subjectName}
+          <div className="flex items-center gap-3 mb-6 flex-wrap">
+            <span className={`px-3 py-1 ${subjectColor} text-white text-sm rounded-full`}>
+              {subjectName}
             </span>
-            <span className="px-3 py-1 bg-gray-100 text-text-secondary text-sm rounded-full">
-              {question.knowledgePoint}
+            {question.chapter && (
+              <span className="px-3 py-1 bg-gray-100 text-text-secondary text-sm rounded-full">
+                {question.chapter}
+              </span>
+            )}
+            {question.difficulty && (
+              <span className="px-3 py-1 bg-gray-100 text-text-secondary text-sm rounded-full">
+                难度：{question.difficulty === 'easy' ? '简单' : question.difficulty === 'hard' ? '困难' : '中等'}
+              </span>
+            )}
+            <span className="text-xs text-text-light ml-auto">
+              {new Date(question.created_at).toLocaleDateString('zh-CN')}
             </span>
-            <span className="text-xs text-text-light ml-auto">{question.createdAt}</span>
           </div>
 
           <div className="mb-6">
-            <h2 className="text-lg font-medium text-text-primary mb-4">{question.content}</h2>
+            <h2 className="text-lg font-medium text-text-primary mb-4 whitespace-pre-wrap">
+              {question.content}
+            </h2>
 
-            {question.options && (
-              <div className="space-y-3">
-                {question.options.map((option, index) => (
-                  <div
-                    key={index}
-                    className={`p-4 rounded-xl border-2 ${
-                      option === question.correctAnswer
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200'
-                    }`}
-                  >
-                    <span className="font-medium">{option}</span>
-                    {option === question.correctAnswer && (
-                      <CheckCircle className="inline-block w-5 h-5 text-green-500 ml-2" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!question.options && (
-              <div className="p-4 bg-green-50 border-2 border-green-500 rounded-xl">
-                <span className="font-medium text-green-700">正确答案：{question.correctAnswer}</span>
-              </div>
-            )}
+            <div className="p-4 bg-green-50 border-2 border-green-500 rounded-xl mb-4">
+              <span className="font-medium text-green-700">
+                正确答案：{question.correct_answer}
+              </span>
+            </div>
           </div>
 
-          <div className="p-4 bg-sky-light rounded-xl mb-6">
-            <h3 className="font-medium text-text-primary mb-2">解析</h3>
-            <p className="text-text-secondary">{question.explanation}</p>
-          </div>
+          {question.wrong_answer && (
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-text-primary mb-2">你的错误答案</h3>
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                <span className="text-red-700">{question.wrong_answer}</span>
+              </div>
+            </div>
+          )}
+
+          {question.error_reason && (
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-text-primary mb-2">错误原因</h3>
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                <p className="text-text-secondary">{question.error_reason}</p>
+              </div>
+            </div>
+          )}
+
+          {question.analysis && (
+            <div className="p-4 bg-sky-light rounded-xl mb-6">
+              <h3 className="font-medium text-text-primary mb-2">解析</h3>
+              <p className="text-text-secondary whitespace-pre-wrap">{question.analysis}</p>
+            </div>
+          )}
 
           {/* 掌握程度修改 */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-text-primary mb-2">掌握程度</label>
-            <select
-              value={mastery}
-              onChange={(e) => setMastery(e.target.value)}
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm"
-            >
-              {masteryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-text-primary mb-2">
+              掌握程度
+            </label>
+            <div className="flex gap-2">
+              <select
+                value={mastery}
+                onChange={(e) => setMastery(e.target.value)}
+                className="flex-1 px-3 py-2 border border-border rounded-lg text-sm"
+                disabled={saving}
+              >
+                {masteryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <Button
+                onClick={handleSaveMastery}
+                disabled={saving || mastery === question.mastery_level}
+                className="gap-2"
+              >
+                {saving ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                保存
+              </Button>
+            </div>
+            {saveMessage && (
+              <p className={`text-sm mt-2 ${saveMessage.includes('失败') ? 'text-error' : 'text-green-600'}`}>
+                {saveMessage}
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1 gap-2">
-              <Edit className="w-4 h-4" />
-              编辑
-            </Button>
-            <Button variant="outline" className="flex-1 gap-2 text-red-500 hover:text-red-500">
-              <Trash2 className="w-4 h-4" />
+            <Button
+              variant="outline"
+              className="flex-1 gap-2 text-red-500 hover:text-red-500"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <span className="w-4 h-4 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
               删除
             </Button>
           </div>
