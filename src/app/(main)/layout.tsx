@@ -9,7 +9,6 @@ import {
   FileQuestion,
   Lightbulb,
   BarChart3,
-  User,
   LogOut,
   Menu,
   X,
@@ -18,6 +17,8 @@ import {
   FolderOpen,
   Sparkles
 } from 'lucide-react'
+import { signOut } from '@/lib/database'
+import { useAppStore } from '@/store'
 
 const navigation = [
   { name: '控制台', href: '/dashboard', icon: LayoutDashboard },
@@ -36,6 +37,22 @@ export default function MainLayout({
 }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const logout = useAppStore((state) => state.logout)
+
+  const handleLogout = async () => {
+    if (!confirm('确定要退出登录吗？')) return
+    try {
+      setLoggingOut(true)
+      await signOut()
+    } catch (err) {
+      console.error('登出失败:', err)
+    } finally {
+      logout()
+      localStorage.removeItem('wrong-book-storage')
+      window.location.href = '/login'
+    }
+  }
 
   return (
     <div className="min-h-screen content-bg">
@@ -106,18 +123,12 @@ export default function MainLayout({
         {/* 底部登出 */}
         <div className="absolute bottom-4 left-4 right-4">
           <button
-            onClick={() => {
-              if (confirm('确定要退出登录吗？')) {
-                // 清除本地存储的登录状态
-                localStorage.removeItem('wrong-book-storage')
-                // 跳转到登录页
-                window.location.href = '/login'
-              }
-            }}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-text-secondary hover:bg-error/10 hover:text-error transition-all"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-text-secondary hover:bg-error/10 hover:text-error transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <LogOut className="w-5 h-5" />
-            退出登录
+            {loggingOut ? '登出中...' : '退出登录'}
           </button>
         </div>
       </aside>
