@@ -17,6 +17,7 @@ import {
   Trophy,
   Zap
 } from 'lucide-react'
+import { addAssessmentRecord } from '@/lib/database'
 
 const mockKnowledgePoints = [
   { id: '1', subject: 'math', name: '二次函数', totalQuestions: 15, correctCount: 8, masteryLevel: 'normal' as MasteryLevel },
@@ -29,7 +30,7 @@ const mockKnowledgePoints = [
   { id: '8', subject: 'chinese', name: '文言文', totalQuestions: 4, correctCount: 0, masteryLevel: 'unfamiliar' as MasteryLevel },
 ]
 
-const generateQuestions = (knowledgePointId: string, _subject: string): AssessmentQuestion[] => {
+const generateQuestions = (knowledgePointId: string): AssessmentQuestion[] => {
   const questionBanks: Record<string, AssessmentQuestion[]> = {
     '1': [
       { id: 'q1', type: 'choice', content: '二次函数 y = x² - 4x + 3 的顶点坐标是？', options: ['(2, -1)', '(2, 1)', '(-2, -1)', '(-2, 1)'], correct_answer: '(2, -1)', explanation: '利用顶点公式 x = -b/2a = 4/2 = 2，代入得 y = 4 - 8 + 3 = -1', knowledgePoint: '二次函数', subject: 'math', difficulty: 'medium' },
@@ -90,11 +91,11 @@ export default function AssessmentPage() {
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([])
   const [answers, setAnswers] = useState<{ questionId: string; answer: string; isCorrect: boolean }[]>([])
 
-  const { startAssessment, submitAnswer, nextQuestion, assessmentSession, endAssessment } = useAppStore()
+  const { startAssessment, submitAnswer, nextQuestion, endAssessment } = useAppStore()
 
   const handleStartAssessment = (kp: typeof mockKnowledgePoints[0]) => {
     setSelectedKnowledgePoint(kp)
-    const generatedQuestions = generateQuestions(kp.id, kp.subject)
+    const generatedQuestions = generateQuestions(kp.id)
     setQuestions(generatedQuestions)
     setAnswers([])
     setCurrentQuestionIndex(0)
@@ -110,11 +111,22 @@ export default function AssessmentPage() {
 
     const currentQuestion = questions[currentQuestionIndex]
     const correct = userAnswer.trim().toLowerCase() === currentQuestion.correct_answer.trim().toLowerCase()
-    
+
     setIsCorrect(correct)
     setShowResult(true)
     submitAnswer(currentQuestion.id, userAnswer)
     setAnswers([...answers, { questionId: currentQuestion.id, answer: userAnswer, isCorrect: correct }])
+
+    // 持久化到数据库（user_id 会被数据库函数覆盖为当前登录用户）
+    addAssessmentRecord({
+      knowledge_point_id: selectedKnowledgePoint?.id,
+      question_id: currentQuestion.id,
+      user_answer: userAnswer,
+      is_correct: correct,
+      user_id: '',
+    }).catch((err: unknown) => {
+      console.error('保存评测记录失败:', err)
+    })
   }
 
   const handleNext = () => {
