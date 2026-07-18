@@ -69,33 +69,68 @@ export default function NewWrongQuestionPage() {
       })
       alert('错题添加成功！')
       router.push('/wrong-questions')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('添加错题失败:', err)
-      setError(err.message || '添加失败，请稍后重试')
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message || '添加失败，请稍后重试')
     } finally {
       setLoading(false)
     }
   }
 
   // 处理图片上传
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
+    const previewUrl = URL.createObjectURL(file)
+    setUploadedImage(previewUrl)
+    setOcrResult('')
     setIsUploading(true)
-    setUploadedImage(URL.createObjectURL(file))
+    setError('')
 
-    // 模拟OCR识别
-    setTimeout(() => {
-      setOcrResult('已识别题目内容：\n\n已知二次函数 y = ax² + bx + c 的图像开口向下，且与 x 轴交于点 (1, 0) 和 (-1, 0)，则下列结论正确的是？\n\nA. a > 0\nB. a < 0\nC. c = 0\nD. b = 0')
+    try {
+      // 读取图片为 base64
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      const res = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: dataUrl }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'OCR 识别失败')
+      }
+
+      const data = await res.json()
+      if (data.lines && data.lines.length > 0) {
+        setOcrResult(data.lines.join('\n'))
+      } else if (data.text) {
+        setOcrResult(data.text)
+      } else {
+        setOcrResult('未识别到任何文字，请手动输入')
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'OCR 识别失败'
+      console.error('OCR 错误:', err)
+      setError(message)
+      setOcrResult('')
+    } finally {
       setIsUploading(false)
-    }, 1500)
+    }
   }
 
   // 使用OCR结果填充表单
   const useOcrResult = () => {
-    if (ocrResult) {
-      setContent(ocrResult.replace('已识别题目内容：\n\n', ''))
+    if (ocrResult && ocrResult !== '未识别到任何文字，请手动输入') {
+      setContent(ocrResult)
     }
   }
 
@@ -264,6 +299,7 @@ export default function NewWrongQuestionPage() {
               />
               {uploadedImage ? (
                 <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={uploadedImage} alt="上传的图片" className="max-h-64 mx-auto rounded-lg" />
                   <button
                     onClick={(e) => {
