@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { Session } from '@supabase/supabase-js'
 
 // 类型定义（与数据库表对应）
 export interface DbUser {
@@ -118,7 +119,9 @@ export async function getCurrentUser() {
 }
 
 // 监听用户状态变化
-export function onAuthStateChange(callback: (event: string, session: any) => void) {
+export function onAuthStateChange(
+  callback: (event: string, session: Session | null) => void
+) {
   return supabase.auth.onAuthStateChange(callback)
 }
 
@@ -254,17 +257,27 @@ export async function getAssessmentRecords(knowledgePointId?: string) {
 
 // ============ 统计分析 ============
 
+export interface UserStats {
+  totalQuestions: number
+  subjectStats: Record<string, number>
+  masteryStats: Record<string, number>
+}
+
+export interface WeeklyStat {
+  day: string
+  date: string
+  count: number
+}
+
 // 获取用户错题统计
-export async function getUserStats() {
+export async function getUserStats(): Promise<UserStats> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('未登录')
 
-  // 获取错题数量
   const { count: totalQuestions } = await supabase
     .from('wrong_questions')
     .select('*', { count: 'exact', head: true })
 
-  // 获取各学科错题数量
   const { data: subjectData } = await supabase
     .from('wrong_questions')
     .select('subject')
@@ -274,7 +287,6 @@ export async function getUserStats() {
     subjectStats[q.subject] = (subjectStats[q.subject] || 0) + 1
   })
 
-  // 获取各掌握程度数量
   const { data: masteryData } = await supabase
     .from('wrong_questions')
     .select('mastery_level')
@@ -289,6 +301,119 @@ export async function getUserStats() {
     subjectStats,
     masteryStats,
   }
+}
+
+// 获取最近 N 天每天的错题新增数（基于 created_at）
+export async function getWeeklyStats(days: number = 7): Promise<WeeklyStat[]> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+
+  const dayLabels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  // 计算 N 天前 0 点
+  const startDate = new Date(today)
+  startDate.setDate(startDate.getDate() - (days - 1))
+
+  const { data, error } = await supabase
+    .from('wrong_questions')
+    .select('created_at')
+    .gte('created_at', startDate.toISOString())
+
+  if (error) throw error
+
+  const buckets: WeeklyStat[] = []
+  for (let i = 0; i < days; i++) {
+    const d = new Date(startDate)
+    d.setDate(d.getDate() + i)
+    buckets.push({
+      day: dayLabels[d.getDay()],
+      date: d.toISOString().slice(0, 10),
+      count: 0,
+    })
+  }
+
+  data?.forEach((q: { created_at: string }) => {
+    const created = new Date(q.created_at)
+    const createdDate = new Date(created.getFullYear(), created.getMonth(), created.getDate())
+    const idx = Math.round((createdDate.getTime() - startDate.getTime()) / 86400000)
+    if (idx >= 0 && idx < days) {
+      buckets[idx].count += 1
+    }
+  })
+
+  return buckets
+}
+
+// 获取最近的错题
+export async function getRecentQuestions(limit: number = 5): Promise<DbWrongQuestion[]> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+
+  const { data, error } = await supabase
+    .from('wrong_questions')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data as DbWrongQuestion[]) || []
+}
+
+// 获取薄弱知识点（按错题数量降序，返回对应 knowledge_point 信息）
+export interface WeakPoint {
+  id: string
+  name: string
+  subject: string
+  count: number
+}
+
+export async function getWeakPoints(limit: number = 5): Promise<WeakPoint[]> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+
+  const { data: questions, error } = await supabase
+    .from('wrong_questions')
+    .select('knowledge_point_id, subject, chapter')
+    .not('knowledge_point_id', 'is', null)
+
+  if (error) throw error
+
+  // 统计每个 knowledge_point_id 的错题数
+  const counter: Record<string, { count: number; subject: string; chapter: string }> = {}
+  questions?.forEach((q: { knowledge_point_id: string; subject: string; chapter: string | null }) => {
+    if (!q.knowledge_point_id) return
+    if (!counter[q.knowledge_point_id]) {
+      counter[q.knowledge_point_id] = { count: 0, subject: q.subject, chapter: q.chapter || '' }
+    }
+    counter[q.knowledge_point_id].count += 1
+  })
+
+  const ids = Object.keys(counter)
+  if (ids.length === 0) return []
+
+  const { data: points, error: pointsError } = await supabase
+    .from('knowledge_points')
+    .select('id, name, subject')
+    .in('id', ids)
+
+  if (pointsError) throw pointsError
+
+  const result: WeakPoint[] = (points || []).map((p: { id: string; name: string; subject: string }) => ({
+    id: p.id,
+    name: p.name,
+    subject: p.subject,
+    count: counter[p.id]?.count || 0,
+  }))
+
+  return result.sort((a, b) => b.count - a.count).slice(0, limit)
+}
+
+// 获取本周新增错题数
+export async function getWeeklyNewCount(): Promise<number> {
+  const stats = await getWeeklyStats(7)
+  return stats.reduce((sum, s) => sum + s.count, 0)
 }
 
 // ============ 练习册相关 ============
