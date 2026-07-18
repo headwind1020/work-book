@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CloudBackground, Button, Input, Select } from '@/components/ui'
+import { CloudBackground, Button } from '@/components/ui'
 import { BookOpen, Mail, Lock, User, ArrowRight, GraduationCap } from 'lucide-react'
 import { signUp } from '@/lib/database'
 
@@ -53,17 +53,17 @@ export default function RegisterPage() {
         alert('注册成功！正在跳转...')
       }
       router.push('/login')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('注册错误:', err)
-      // 提供更友好的错误提示
-      if (err.message?.includes('already registered')) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message.includes('already registered')) {
         setError('该邮箱已被注册，请直接登录或使用其他邮箱')
-      } else if (err.message?.includes('Invalid email')) {
+      } else if (message.includes('Invalid email')) {
         setError('请输入有效的邮箱地址')
-      } else if (err.message?.includes('Password')) {
+      } else if (message.includes('Password')) {
         setError('密码强度不够，请使用更复杂的密码')
       } else {
-        setError(err.message || '注册失败，请稍后重试')
+        setError(message || '注册失败，请稍后重试')
       }
     } finally {
       setLoading(false)

@@ -52,6 +52,7 @@ export default function WorkbookDetailPage() {
     if (workbookId) {
       loadData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workbookId])
 
   const loadData = async () => {

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CloudBackground, Button, Input } from '@/components/ui'
+import { CloudBackground, Button } from '@/components/ui'
 import { BookOpen, Mail, Lock, ArrowRight } from 'lucide-react'
 import { signIn } from '@/lib/database'
 
@@ -22,17 +22,17 @@ export default function LoginPage() {
     try {
       await signIn(email, password)
       router.push('/dashboard')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('登录错误:', err)
-      // 提供更友好的错误提示
-      if (err.message?.includes('Invalid login credentials')) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message.includes('Invalid login credentials')) {
         setError('邮箱或密码错误，请检查后重试')
-      } else if (err.message?.includes('Email not confirmed')) {
+      } else if (message.includes('Email not confirmed')) {
         setError('请先前往邮箱验证您的账号')
-      } else if (err.message?.includes('Too many requests')) {
+      } else if (message.includes('Too many requests')) {
         setError('登录尝试过多，请稍后再试')
       } else {
-        setError(err.message || '登录失败，请检查邮箱和密码')
+        setError(message || '登录失败，请检查邮箱和密码')
       }
     } finally {
       setLoading(false)

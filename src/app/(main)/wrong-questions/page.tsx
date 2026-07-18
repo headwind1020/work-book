@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Card, Button, Input, Select } from '@/components/ui'
-import { Plus, Search, ChevronRight, Trash2, Edit, Download, X, FileText, Sparkles } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Card, Button, Select } from '@/components/ui'
+import { Plus, Search, ChevronRight, Trash2, Download, X, FileText, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { getWrongQuestions, deleteWrongQuestion, DbWrongQuestion } from '@/lib/database'
 import { debounce } from '@/lib/utils'
@@ -31,9 +31,12 @@ export default function WrongQuestionsPage() {
 
   // 防抖搜索
   const debouncedSearch = useCallback(
-    debounce((value: string) => {
-      setSearch(value)
-    }, 300),
+    (value: string) => {
+      const handler = debounce((v: string) => {
+        setSearch(v)
+      }, 300)
+      handler(value)
+    },
     []
   )
 
@@ -60,10 +63,11 @@ export default function WrongQuestionsPage() {
       setLoading(true)
       const data = await getWrongQuestions()
       setQuestions(data)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('加载错题失败:', err)
+      const message = err instanceof Error ? err.message : String(err)
       // 如果未登录或出错，显示提示
-      if (err.message === '未登录') {
+      if (message === '未登录') {
         setError('请先登录')
       } else {
         setError('加载失败，请刷新页面')
@@ -224,18 +228,21 @@ export default function WrongQuestionsPage() {
 
   // 处理删除 - 带防抖防止重复点击
   const handleDelete = useCallback(
-    debounce(async (id: string) => {
-      if (!confirm('确定要删除这道错题吗？')) return
-      try {
-        await deleteWrongQuestion(id)
-        setQuestions(questions.filter(q => q.id !== id))
-        alert('删除成功')
-      } catch (err) {
-        console.error('删除失败:', err)
-        alert('删除失败')
-      }
-    }, 500),
-    [questions]
+    (id: string) => {
+      const handler = debounce(async (qid: string) => {
+        if (!confirm('确定要删除这道错题吗？')) return
+        try {
+          await deleteWrongQuestion(qid)
+          setQuestions((prev) => prev.filter(q => q.id !== qid))
+          alert('删除成功')
+        } catch (err) {
+          console.error('删除失败:', err)
+          alert('删除失败')
+        }
+      }, 500)
+      handler(id)
+    },
+    []
   )
 
   // 加载中
