@@ -100,7 +100,8 @@ export default function AssessmentPage() {
     if (!userAnswer.trim()) return
 
     const currentQuestion = questions[currentQuestionIndex]
-    const correct = userAnswer.trim().toLowerCase() === currentQuestion.correct_answer.trim().toLowerCase()
+    const expected = (currentQuestion.correct_answer || '').trim().toLowerCase()
+    const correct = userAnswer.trim().toLowerCase() === expected
 
     setIsCorrect(correct)
     setShowResult(true)
@@ -386,7 +387,8 @@ export default function AssessmentPage() {
 
   if (view === 'result') {
     const score = getScore()
-    const rate = Math.round((score / questions.length) * 100)
+    const total = questions.length
+    const rate = total > 0 ? Math.round((score / total) * 100) : 0
     const newMastery = getNewMasteryLevel()
 
     return (

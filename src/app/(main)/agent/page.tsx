@@ -84,7 +84,9 @@ export default function AgentPage() {
     if (!input.trim() || loading) return
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       role: 'user',
       content: input.trim(),
       timestamp: new Date(),
@@ -114,7 +116,9 @@ export default function AgentPage() {
 
       const data = await response.json()
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now() + 1}-${Math.random().toString(36).slice(2)}`,
         role: 'assistant',
         content: data.choices?.[0]?.message?.content || '抱歉，我暂时无法回答这个问题。',
         timestamp: new Date(),
@@ -125,7 +129,9 @@ export default function AgentPage() {
       console.error('发送消息失败:', error)
       const message = error instanceof Error ? error.message : String(error)
       const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now() + 2}-${Math.random().toString(36).slice(2)}`,
         role: 'assistant',
         content: message || '抱歉，发生了错误，请稍后重试。',
         timestamp: new Date(),

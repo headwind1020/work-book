@@ -142,7 +142,7 @@ export async function getKnowledgePoints() {
 }
 
 // 添加知识点
-export async function addKnowledgePoint(point: Omit<DbKnowledgePoint, 'id' | 'created_at'>) {
+export async function addKnowledgePoint(point: Omit<DbKnowledgePoint, 'id' | 'created_at' | 'user_id'>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('未登录')
 
@@ -470,8 +470,17 @@ export async function updateWorkbook(id: string, updates: Partial<DbWorkbook>) {
   return data[0] as DbWorkbook
 }
 
-// 删除练习册
+// 删除练习册（同时级联删除 workbook_questions 关联记录）
 export async function deleteWorkbook(id: string) {
+  // 先删除关联的题目
+  const { error: wqError } = await supabase
+    .from('workbook_questions')
+    .delete()
+    .eq('workbook_id', id)
+
+  if (wqError) throw wqError
+
+  // 再删除练习册本身
   const { error } = await supabase
     .from('workbooks')
     .delete()

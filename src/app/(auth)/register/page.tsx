@@ -44,10 +44,11 @@ export default function RegisterPage() {
 
       if (result.needsEmailConfirmation) {
         alert('注册成功！请前往邮箱点击验证链接完成注册。')
+        router.push('/login')
       } else {
         alert('注册成功！正在跳转...')
+        router.push('/dashboard')
       }
-      router.push('/login')
     } catch (err: unknown) {
       console.error('注册错误:', err)
       const message = err instanceof Error ? err.message : String(err)

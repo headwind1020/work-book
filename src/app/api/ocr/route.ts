@@ -99,9 +99,15 @@ export async function POST(request: NextRequest) {
       text,
       lines,
     })
-  } catch (error) {
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'OCR 调用失败'
     console.error('OCR error:', error)
-    return NextResponse.json({ error: message }, { status: 500 })
+
+    // 阿里云 SDK 抛出的客户端错误（如图片过小/格式错）以 code 开头
+    // 客户端错误返回 4xx，服务端错误返回 5xx
+    const status = /^(illegalImageSize|Image Decode Error|Invalid Input Parameters|410|416|400|60103|50207|61301)/i.test(message)
+      ? 400
+      : 500
+    return NextResponse.json({ error: message }, { status })
   }
 }

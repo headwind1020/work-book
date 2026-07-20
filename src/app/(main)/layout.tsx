@@ -39,6 +39,10 @@ export default function MainLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const logout = useAppStore((state) => state.logout)
+  const user = useAppStore((state) => state.user)
+
+  const displayName = user?.name || '学生用户'
+  const initial = (user?.name || '学').charAt(0)
 
   const handleLogout = async () => {
     if (!confirm('确定要退出登录吗？')) return
@@ -49,7 +53,11 @@ export default function MainLayout({
       console.error('登出失败:', err)
     } finally {
       logout()
-      localStorage.removeItem('wrong-book-storage')
+      try {
+        useAppStore.persist.clearStorage()
+      } catch {
+        localStorage.removeItem('wrong-book-storage')
+      }
       window.location.href = '/login'
     }
   }
@@ -79,9 +87,9 @@ export default function MainLayout({
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-sky-light rounded-full">
               <div className="w-7 h-7 bg-gradient-to-br from-sky to-sky-dark rounded-full flex items-center justify-center text-white text-sm font-medium">
-                学
+                {initial}
               </div>
-              <span className="text-sm font-medium text-text-primary hidden sm:block">学生用户</span>
+              <span className="text-sm font-medium text-text-primary hidden sm:block">{displayName}</span>
               <ChevronDown className="w-4 h-4 text-text-secondary" />
             </div>
           </div>

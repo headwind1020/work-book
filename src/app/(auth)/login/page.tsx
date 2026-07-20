@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CloudBackground, Button } from '@/components/ui'
 import { BookOpen, Mail, Lock, ArrowRight } from 'lucide-react'
@@ -9,6 +9,8 @@ import { signIn } from '@/lib/database'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirectTo') || '/dashboard'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,7 +23,12 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password)
-      router.push('/dashboard')
+      // 安全校验：redirectTo 必须是站内相对路径
+      const safeRedirect =
+        redirectTo.startsWith('/') && !redirectTo.startsWith('//')
+          ? redirectTo
+          : '/dashboard'
+      router.push(safeRedirect)
     } catch (err: unknown) {
       console.error('登录错误:', err)
       const message = err instanceof Error ? err.message : String(err)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Card, CardContent, Button, Input, Select } from '@/components/ui'
 import { ArrowLeft, Save, Camera, Keyboard, Upload, X, Sparkles } from 'lucide-react'
 import Link from 'next/link'
@@ -29,6 +29,13 @@ export default function NewWrongQuestionPage() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [ocrResult, setOcrResult] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 组件卸载时释放 blob URL
+  useEffect(() => {
+    return () => {
+      if (uploadedImage) URL.revokeObjectURL(uploadedImage)
+    }
+  }, [uploadedImage])
 
   const handleSubmit = async () => {
     if (!subject || !questionType || !content || !correctAnswer) {

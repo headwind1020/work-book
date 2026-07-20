@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, Button, Input } from '@/components/ui'
 import { Plus, Search, Lightbulb, TrendingUp, X, ArrowRight, ChevronRight, Sparkles, Save } from 'lucide-react'
 import Link from 'next/link'
@@ -57,13 +57,11 @@ export default function KnowledgePage() {
     }
   }
 
-  const debouncedSearch = useCallback(
-    (value: string) => {
-      const handler = debounce((v: string) => {
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((v: string) => {
         setSearch(v)
-      }, 300)
-      handler(value)
-    },
+      }, 300),
     []
   )
 
@@ -101,7 +99,6 @@ export default function KnowledgePage() {
         name: newName.trim(),
         subject: newSubject,
         description: newDescription.trim(),
-        user_id: '',
         mastery_level: 'unfamiliar',
       })
       await loadData()

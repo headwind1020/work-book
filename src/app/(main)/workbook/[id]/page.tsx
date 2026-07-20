@@ -34,13 +34,40 @@ export default function WorkbookDetailPage() {
   const [name, setName] = useState('')
 
   useEffect(() => {
-    if (workbookId) {
-      loadData()
+  if (!workbookId) {
+    return
+  }
+  let cancelled = false
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  setLoading(true)
+  setWorkbook(null)
+  setWorkbookQuestions([])
+  Promise.all([
+      getWorkbookById(workbookId),
+      getWorkbookQuestions(workbookId),
+      getWrongQuestions(),
+    ])
+      .then(([workbookData, questionsData, allQuestionsData]) => {
+        if (cancelled) return
+        setWorkbook(workbookData)
+        setWorkbookQuestions(questionsData)
+        setAllQuestions(allQuestionsData)
+        setName(workbookData.name)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        console.error('加载数据失败:', error)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workbookId])
 
   const loadData = async () => {
+    if (!workbookId) return
     try {
       const [workbookData, questionsData, allQuestionsData] = await Promise.all([
         getWorkbookById(workbookId),
@@ -53,8 +80,6 @@ export default function WorkbookDetailPage() {
       setName(workbookData.name)
     } catch (error) {
       console.error('加载数据失败:', error)
-    } finally {
-      setLoading(false)
     }
   }
 

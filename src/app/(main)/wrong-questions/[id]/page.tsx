@@ -34,26 +34,33 @@ export default function WrongQuestionDetailPage() {
   const [saveMessage, setSaveMessage] = useState('')
 
   useEffect(() => {
-    if (questionId) {
-      loadQuestion()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questionId])
-
-  const loadQuestion = async () => {
-    try {
-      setLoading(true)
-      setError('')
-      const data = await getWrongQuestionById(questionId)
-      setQuestion(data)
-      setMastery(data.mastery_level || 'unfamiliar')
-    } catch (err: unknown) {
-      console.error('加载错题失败:', err)
-      setError('加载失败，该错题可能已被删除')
-    } finally {
+    if (!questionId) {
+      setError('无效的题目 ID')
       setLoading(false)
+      return
     }
-  }
+    let cancelled = false
+    setLoading(true)
+    setQuestion(null)
+    setError('')
+    getWrongQuestionById(questionId)
+      .then((data) => {
+        if (cancelled) return
+        setQuestion(data)
+        setMastery(data.mastery_level || 'unfamiliar')
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        console.error('加载错题失败:', err)
+        setError('加载失败，该错题可能已被删除')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [questionId])
 
   const handleSaveMastery = async () => {
     if (!question) return

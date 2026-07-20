@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, Button, Select } from '@/components/ui'
 import { Plus, Search, ChevronRight, Trash2, Download, X, FileText, Sparkles } from 'lucide-react'
 import Link from 'next/link'
@@ -24,13 +24,11 @@ export default function WrongQuestionsPage() {
   const [mastery, setMastery] = useState('')
 
   // 防抖搜索
-  const debouncedSearch = useCallback(
-    (value: string) => {
-      const handler = debounce((v: string) => {
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((v: string) => {
         setSearch(v)
-      }, 300)
-      handler(value)
-    },
+      }, 300),
     []
   )
 
@@ -193,9 +191,9 @@ export default function WrongQuestionsPage() {
   }
 
   // 处理删除 - 带防抖防止重复点击
-  const handleDelete = useCallback(
-    (id: string) => {
-      const handler = debounce(async (qid: string) => {
+  const handleDelete = useMemo(
+    () =>
+      debounce(async (qid: string) => {
         if (!confirm('确定要删除这道错题吗？')) return
         try {
           await deleteWrongQuestion(qid)
@@ -205,9 +203,7 @@ export default function WrongQuestionsPage() {
           console.error('删除失败:', err)
           alert('删除失败')
         }
-      }, 500)
-      handler(id)
-    },
+      }, 500),
     []
   )
 
