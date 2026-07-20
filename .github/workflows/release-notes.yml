@@ -1,0 +1,90 @@
+name: Release Notes
+
+# 推送代码到 main 分支时，自动根据 commits 创建/更新 GitHub Release，
+# 便于记录每次发布的修改清单。
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: commits } = await github.rest.repos.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              per_page: 50,
+            });
+            const previousTag = '${{ steps.get_tag.outputs.tag }}';
+
+            let body = '## 🚀 自动发布\n\n';
+            body += `本版本基于 commit \`${context.sha.substring(0, 7)}\`\n\n`;
+
+            // 按 commit 类型分组
+            const features = [];
+            const fixes = [];
+            const chores = [];
+            const others = [];
+
+            for (const c of commits) {
+              if (!previousTag && c.sha === commits[commits.length - 1].sha) continue;
+              const msg = c.commit.message.split('\n')[0];
+              if (msg.startsWith('feat')) features.push(msg);
+              else if (msg.startsWith('fix')) fixes.push(msg);
+              else if (msg.startsWith('chore') || msg.startsWith('refactor')) chores.push(msg);
+              else others.push(msg);
+            }
+
+            if (features.length) {
+              body += '### ✨ 新功能\n';
+              features.forEach(m => body += `- ${m}\n`);
+              body += '\n';
+            }
+            if (fixes.length) {
+              body += '### 🐛 Bug 修复\n';
+              fixes.forEach(m => body += `- ${m}\n`);
+              body += '\n';
+            }
+            if (chores.length) {
+              body += '### 🔧 重构 / 杂项\n';
+              chores.forEach(m => body += `- ${m}\n`);
+              body += '\n';
+            }
+            if (others.length) {
+              body += '### 📝 其他\n';
+              others.forEach(m => body += `- ${m}\n`);
+              body += '\n';
+            }
+
+            core.setOutput('notes', body);
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-${{ github.run_number }}-${{ github.run_attempt }}
+          name: Release ${{ github.run_number }}
+          body: ${{ steps.notes.outputs.notes }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
