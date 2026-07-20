@@ -1,6 +1,9 @@
 'use client'
 
 import { Suspense, useState } from 'react'
+
+// 强制每次请求重新渲染，避免 SSR/CSR 输出不一致
+export const dynamic = 'force-dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CloudBackground, Button } from '@/components/ui'

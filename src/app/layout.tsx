@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
+import { StoreHydrator } from "@/components/StoreHydrator";
 
 const notoSans = Noto_Sans_SC({
   variable: "--font-noto-sans",
@@ -21,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={`${notoSans.variable} antialiased`}>
+        <StoreHydrator />
         {children}
       </body>
     </html>

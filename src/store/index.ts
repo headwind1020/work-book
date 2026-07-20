@@ -178,6 +178,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'wrong-book-storage',
+      skipHydration: true,
     }
   )
 )
