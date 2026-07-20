@@ -70,45 +70,68 @@ export interface DbWorkbookQuestion {
 
 // ============ 用户相关 ============
 
-// 注册新用户
+// 注册新用户：通过服务端 API 路由
 export async function signUp(email: string, password: string, name: string, role: string = 'student') {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        name,
-        role,
-      },
-      emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard`,
-    },
+  const res = await fetch('/api/auth/sign-up', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name, role }),
   })
 
-  if (error) throw error
-
-  // 如果需要邮箱验证，Supabase会返回session为null
-  // 但用户已经创建成功，只是需要验证邮箱
-  return {
-    ...data,
-    needsEmailConfirmation: data.session === null,
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({} as { error?: string }))
+    throw new Error(err.error || `注册失败 (${res.status})`)
   }
-}
 
-// 登录
-export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
-
-  if (error) throw error
+  const data = await res.json()
+  if (data.session) {
+    await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    })
+  }
   return data
 }
 
-// 退出登录
+// 登录：通过服务端 API 路由调用 Supabase，避免浏览器直接连接的 CORS/DNS/代理问题
+export async function signIn(email: string, password: string) {
+  const res = await fetch('/api/auth/sign-in', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({} as { error?: string }))
+    const message = err.error || `登录失败 (${res.status})`
+    throw new Error(message)
+  }
+
+  const data = await res.json()
+  // 让客户端 supabase 知道 session，刷新本地状态
+  if (data.session) {
+    await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    })
+  }
+  return data
+}
+
+// 退出登录：通过服务端 API 路由清除服务端 cookie
 export async function signOut() {
-  const { error } = await supabase.auth.signOut()
-  if (error) throw error
+  // 服务端 signOut 需要 cookie 上下文；浏览器端走 supabase.auth.signOut 清除本地 cookie
+  // 先尝试服务端（如果失败回退客户端）
+  try {
+    await fetch('/api/auth/sign-out', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+  } catch (err) {
+    console.warn('服务端 signOut 失败，使用本地登出:', err)
+  }
+  // 同时清除客户端会话
+  await supabase.auth.signOut()
 }
 
 // 获取当前用户
