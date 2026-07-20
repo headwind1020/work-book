@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 
 export const runtime = 'nodejs'
 
@@ -19,21 +18,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Supabase 未配置' }, { status: 500 })
     }
 
-    const cookieStore = await cookies()
-
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
-          return cookieStore.getAll()
+          return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // RSC 中 set 会被忽略
-          }
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
         },
       },
     })
@@ -47,10 +40,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: 401 })
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: data.user,
       session: data.session,
     })
+
+    // 将 request cookies 同步到 response
+    const setCookies = request.cookies.getAll()
+    setCookies.forEach(({ name, value }) => {
+      response.cookies.set(name, value)
+    })
+
+    return response
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '登录失败'
     console.error('Sign-in error:', err)
