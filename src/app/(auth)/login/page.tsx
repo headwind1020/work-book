@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CloudBackground, Button } from '@/components/ui'
 import { BookOpen, Mail, Lock, ArrowRight } from 'lucide-react'
 import { signIn } from '@/lib/database'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/dashboard'
@@ -47,6 +47,78 @@ export default function LoginPage() {
   }
 
   return (
+    <form onSubmit={handleLogin} className="space-y-5">
+      <div>
+        <label className="block text-sm font-medium text-text-primary mb-1.5">
+          邮箱
+        </label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-light" />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="请输入邮箱"
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-border bg-white text-text-primary placeholder:text-text-light focus:border-sky focus:ring-2 focus:ring-sky/20 transition-all"
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-text-primary mb-1.5">
+          密码
+        </label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-light" />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="请输入密码"
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-border bg-white text-text-primary placeholder:text-text-light focus:border-sky focus:ring-2 focus:ring-sky/20 transition-all"
+            required
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-sm text-error text-center">{error}</p>
+      )}
+
+      <Button
+        type="submit"
+        className="w-full py-3.5 text-lg font-medium"
+        disabled={loading}
+      >
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            登录中...
+          </span>
+        ) : (
+          <span className="flex items-center gap-2">
+            登录
+            <ArrowRight className="w-5 h-5" />
+          </span>
+        )}
+      </Button>
+    </form>
+  )
+}
+
+function LoginFormFallback() {
+  return (
+    <div className="space-y-5">
+      <div className="h-12 bg-gray-100 rounded-xl animate-pulse"></div>
+      <div className="h-12 bg-gray-100 rounded-xl animate-pulse"></div>
+      <div className="h-12 bg-gray-200 rounded-xl animate-pulse"></div>
+    </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
     <CloudBackground>
       <div className="min-h-screen flex items-center justify-center px-4 py-12">
         {/* 登录卡片 */}
@@ -65,64 +137,9 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* 登录表单 */}
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-1.5">
-                  邮箱
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-light" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="请输入邮箱"
-                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-border bg-white text-text-primary placeholder:text-text-light focus:border-sky focus:ring-2 focus:ring-sky/20 transition-all"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-1.5">
-                  密码
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-light" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="请输入密码"
-                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-border bg-white text-text-primary placeholder:text-text-light focus:border-sky focus:ring-2 focus:ring-sky/20 transition-all"
-                    required
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <p className="text-sm text-error text-center">{error}</p>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full py-3.5 text-lg font-medium"
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    登录中...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    登录
-                    <ArrowRight className="w-5 h-5" />
-                  </span>
-                )}
-              </Button>
-            </form>
+            <Suspense fallback={<LoginFormFallback />}>
+              <LoginForm />
+            </Suspense>
 
             {/* 注册链接 */}
             <p className="text-center mt-6 text-text-secondary">
