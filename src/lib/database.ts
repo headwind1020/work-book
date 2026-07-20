@@ -70,7 +70,7 @@ export interface DbWorkbookQuestion {
 
 // ============ 用户相关 ============
 
-// 注册新用户：通过服务端 API 路由
+// 注册新用户：通过服务端 API 路由（服务端自动设置 cookie）
 export async function signUp(email: string, password: string, name: string, role: string = 'student') {
   const res = await fetch('/api/auth/sign-up', {
     method: 'POST',
@@ -83,17 +83,12 @@ export async function signUp(email: string, password: string, name: string, role
     throw new Error(err.error || `注册失败 (${res.status})`)
   }
 
-  const data = await res.json()
-  if (data.session) {
-    await supabase.auth.setSession({
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-    })
-  }
-  return data
+  // 服务端已设置 cookie
+  await supabase.auth.refreshSession()
+  return res.json()
 }
 
-// 登录：通过服务端 API 路由调用 Supabase，避免浏览器直接连接的 CORS/DNS/代理问题
+// 登录：通过服务端 API 路由调用 Supabase（服务端自动设置 cookie）
 export async function signIn(email: string, password: string) {
   const res = await fetch('/api/auth/sign-in', {
     method: 'POST',
@@ -107,15 +102,9 @@ export async function signIn(email: string, password: string) {
     throw new Error(message)
   }
 
-  const data = await res.json()
-  // 让客户端 supabase 知道 session，刷新本地状态
-  if (data.session) {
-    await supabase.auth.setSession({
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-    })
-  }
-  return data
+  // 服务端已设置 cookie，前端刷新 session 即可
+  await supabase.auth.refreshSession()
+  return res.json()
 }
 
 // 退出登录：通过服务端 API 路由清除服务端 cookie
