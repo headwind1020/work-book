@@ -1,62 +1,23 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Card, CardContent, Button, Input, Select } from '@/components/ui'
 import { ArrowLeft, Save, Camera, Keyboard, Upload, X, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { addWrongQuestion } from '@/lib/database'
-import type { Subject, Difficulty } from '@/lib/supabase'
-import { stripLatex } from '@/lib/text-utils'
-
-const subjectOptions = [
-  { value: 'math', label: '数学' },
-  { value: 'physics', label: '物理' },
-  { value: 'english', label: '英语' },
-  { value: 'chinese', label: '语文' },
-  { value: 'chemistry', label: '化学' },
-]
-
-const questionTypeOptions = [
-  { value: 'choice', label: '选择题' },
-  { value: 'fill', label: '填空题' },
-  { value: 'judge', label: '判断题' },
-  { value: 'answer', label: '解答题' },
-]
-
-const difficultyOptions = [
-  { value: 'easy', label: '简单' },
-  { value: 'medium', label: '中等' },
-  { value: 'hard', label: '困难' },
-]
-
-// 客户端直连阿里云 MaaS（自定义域名）
-const MAAS_BASE_URL = 'https://llm-6o2wwdhcy3mx1z74.cn-beijing.maas.aliyuncs.com/compatible-mode/v1'
-const MAAS_API_KEY = 'sk-19e2d059b5df4bb485f32d9233c104f0'
-const MAAS_MODEL = 'qwen-vl-max'
-
-const SYSTEM_PROMPT = `你是初中数学错题解析老师。
-
-**最关键的输出规则**：
-- content 字段**只含题目原文**，不要任何解题步骤、推导过程或自检
-- 把所有解题过程放在 analysis 字段
-- 答案放在 correctAnswer 字段
-- 知识点放在 knowledgePoint 字段
-
-字段定义（严格遵守）：
-- content: 仅题目文字（不含"解："、"分析："等引导词）
-- correctAnswer: 最终答案（坐标、值或表达式）
-- analysis: 完整解题步骤 + 自检
-- knowledgePoint: ≤10 字
-
-只用 JSON 输出，不要 markdown 代码块。`
+import {
+  subjectOptions,
+  difficultyOptions,
+  questionTypeOptions,
+} from '@/lib/constants'
 
 export default function NewWrongQuestionPage() {
   const router = useRouter()
   const [inputType, setInputType] = useState<'manual' | 'camera'>('manual')
-  const [subject, setSubject] = useState<Subject | ''>('math')
+  const [subject, setSubject] = useState('')
   const [questionType, setQuestionType] = useState('')
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium')
+  const [difficulty, setDifficulty] = useState('medium')
   const [content, setContent] = useState('')
   const [correctAnswer, setCorrectAnswer] = useState('')
   const [explanation, setExplanation] = useState('')
@@ -67,19 +28,34 @@ export default function NewWrongQuestionPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [ocrResult, setOcrResult] = useState('')
+  const [recognizedData, setRecognizedData] = useState<{
+    content: string
+    correctAnswer: string
+    analysis: string
+    knowledgePoint: string
+    difficulty: string
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 组件卸载时释放 blob URL
+  useEffect(() => {
+    return () => {
+      if (uploadedImage) URL.revokeObjectURL(uploadedImage)
+    }
+  }, [uploadedImage])
 
   const handleSubmit = async () => {
     if (!subject || !questionType || !content || !correctAnswer) {
       alert('请填写完整信息！')
       return
     }
+
     setLoading(true)
     setError('')
 
     try {
       await addWrongQuestion({
-        subject: subject as Subject,
+        subject,
         content,
         correct_answer: correctAnswer,
         analysis: explanation,
@@ -88,119 +64,46 @@ export default function NewWrongQuestionPage() {
         mastery_level: 'unfamiliar',
         wrong_answer: '',
         error_reason: '',
-        content_image_url: '',
       })
       alert('错题添加成功！')
       router.push('/wrong-questions')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '添加失败，请稍后重试'
-      setError(message)
+    } catch (err: unknown) {
+      console.error('添加错题失败:', err)
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message || '添加失败，请稍后重试')
     } finally {
       setLoading(false)
     }
   }
 
-  // 直接调用阿里云 MaaS（绕过 Vercel 函数限制）
-  const callMaasDirect = async (
-    imageBase64: string,
-    subj: Subject | '',
-  ): Promise<{ content: string; correctAnswer: string; analysis: string; knowledgePoint: string; difficulty: string }> => {
-    const cleaned = imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '')
-
-    const response = await fetch(`${MAAS_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${MAAS_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MAAS_MODEL,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${cleaned}` } },
-              {
-                type: 'text',
-                text: `分析这张${subj || '数学'}错题图片。严格输出 JSON（不要 markdown）：
-
-{
-  "content": "题目原文（公式用 $LaTeX$）",
-  "correctAnswer": "本题最终答案",
-  "analysis": "步骤1: ...\\n步骤2: ...\\n【自检】代入验证：...",
-  "knowledgePoint": "考察的知识点（≤10字）",
-  "difficulty": "easy|medium|hard",
-  "errorReason": "常见错误原因"
-}`,
-              },
-            ],
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 2048,
-        response_format: { type: 'json_object' },
-      }),
+  // 将图片压缩到最长边 1024px、JPEG 0.7，避免 Vercel 4.5MB 请求体限制
+  const compressImage = async (file: File, maxEdge = 1024, quality = 0.7): Promise<string> => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
     })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      throw new Error(`MaaS ${response.status}: ${errText.slice(0, 200)}`)
-    }
-
-    const data = await response.json()
-    let text: string = data.choices?.[0]?.message?.content || ''
-
-    let parsed: Record<string, unknown> = {}
-    try {
-      parsed = JSON.parse(text)
-    } catch {
-      const m = text.match(/\{[\s\S]*\}/)
-      if (m) {
-        try {
-          parsed = JSON.parse(m[0])
-        } catch {
-          parsed = { content: text }
-        }
-      } else {
-        parsed = { content: text }
-      }
-    }
-
-    // 兜底 1：从 analysis 文本里提取"最终答案"
-    let correctAnswer = (parsed.correctAnswer as string) ?? ''
-    if (!correctAnswer && parsed.analysis) {
-      const analysis = String(parsed.analysis)
-      const patterns = [
-        /【自检】[\s\S]*?答案[：:]\s*([^\n。]+)/,
-        /最终答案[：:]\s*([^\n。]+)/,
-        /答案[：:]\s*([^\n。]+)/,
-        /∴\s*([^\n。]+)/,
-      ]
-      for (const p of patterns) {
-        const m = analysis.match(p)
-        if (m) {
-          correctAnswer = m[1].trim()
-          break
-        }
-      }
-    }
-
-    // 兜底 2：从 content 里提取（如果模型没分字段）
-    if (!correctAnswer && parsed.content) {
-      const m = String(parsed.content).match(/答案[：:]\s*([^\n。]+)/)
-      if (m) correctAnswer = m[1].trim()
-    }
-
-    return {
-      content: stripLatex((parsed.content as string) ?? ''),
-      correctAnswer: stripLatex(correctAnswer),
-      analysis: stripLatex((parsed.analysis as string) ?? ''),
-      knowledgePoint: stripLatex((parsed.knowledgePoint as string) ?? ''),
-      difficulty: (parsed.difficulty as string) ?? 'medium',
-    }
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image()
+      i.onload = () => resolve(i)
+      i.onerror = reject
+      i.src = dataUrl
+    })
+    const longest = Math.max(img.width, img.height)
+    const scale = longest > maxEdge ? maxEdge / longest : 1
+    const w = Math.round(img.width * scale)
+    const h = Math.round(img.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return dataUrl
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL('image/jpeg', quality)
   }
 
+  // 处理图片上传
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -212,38 +115,94 @@ export default function NewWrongQuestionPage() {
     setError('')
 
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
+      const dataUrl = await compressImage(file)
 
-      const result = await callMaasDirect(dataUrl, subject)
-
-      if (result.content) {
-        setContent(result.content)
-        if (result.correctAnswer) setCorrectAnswer(result.correctAnswer)
-        if (result.analysis) setExplanation(result.analysis)
-        if (result.knowledgePoint) setKnowledgePoint(result.knowledgePoint)
-        if (result.difficulty) setDifficulty(result.difficulty as Difficulty)
-
-        // 卡片只展示"是否成功 + 识别到的答案摘要"
-        const summary = result.correctAnswer
-          ? `✅ 已识别完成\n\n题目已填，答案：${result.correctAnswer.slice(0, 80)}${result.correctAnswer.length > 80 ? '...' : ''}`
-          : result.knowledgePoint
-            ? `✅ 已识别（未返回答案，请手动填写）\n\n知识点：${result.knowledgePoint}`
-            : `✅ 已识别题目，请填写正确答案`
-        setOcrResult(summary)
-      } else {
-        setOcrResult('⚠️ 未识别到任何文字，请手动输入')
+      let res: Response
+      try {
+        res = await fetch('/api/ai/recognize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: dataUrl,
+            subject: subject || 'math',
+          }),
+        })
+      } catch (networkErr) {
+        throw new Error('网络请求失败（fetch failed）。请检查网络后重试，或稍后再试。')
       }
-    } catch (err) {
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `识别失败（HTTP ${res.status}）`)
+      }
+
+      const data = await res.json()
+
+      if (data.content) {
+        let recognized = {
+          content: data.content ?? '',
+          correctAnswer: data.correctAnswer ?? '',
+          analysis: data.analysis ?? '',
+          knowledgePoint: data.knowledgePoint ?? '',
+          difficulty: data.difficulty ?? 'medium',
+        }
+
+        // 兜底 1：模型把正确答塞进了 content 字段（前面带"正确答案："等关键字）
+        if (!recognized.correctAnswer && recognized.content) {
+          const m = recognized.content.match(/正确答案[：:]\s*([\s\S]+?)(?:\n\n|$)/)
+          if (m) recognized.correctAnswer = m[1].trim()
+        }
+
+        // 兜底 2：content 本身是 JSON 字符串（模型偶发把整段 JSON 吐回 content）
+        if ((!recognized.correctAnswer || recognized.content.startsWith('{')) && recognized.content.startsWith('{')) {
+          try {
+            const inner = JSON.parse(recognized.content)
+            if (inner.content) recognized.content = inner.content
+            if (inner.correctAnswer) recognized.correctAnswer = inner.correctAnswer
+            if (inner.analysis) recognized.analysis = inner.analysis
+            if (inner.knowledgePoint) recognized.knowledgePoint = inner.knowledgePoint
+          } catch {
+            // 不是 JSON，忽略
+          }
+        }
+
+        setRecognizedData(recognized)
+        // 自动填充表单
+        setContent(recognized.content)
+        if (recognized.correctAnswer) setCorrectAnswer(recognized.correctAnswer)
+        if (recognized.analysis) setExplanation(recognized.analysis)
+        if (recognized.knowledgePoint) setKnowledgePoint(recognized.knowledgePoint)
+        if (recognized.difficulty) setDifficulty(recognized.difficulty as 'easy' | 'medium' | 'hard')
+        setOcrResult(
+          recognized.correctAnswer
+            ? `✅ 已识别题目\n\n题目：${recognized.content}\n\n正确答案：${recognized.correctAnswer}`
+            : `已识别：${recognized.content}`
+        )
+      } else {
+        setOcrResult('未识别到任何文字，请手动输入')
+      }
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '识别失败'
+      console.error('识别错误:', err)
       setError(message)
       setOcrResult('')
     } finally {
       setIsUploading(false)
+    }
+  }
+
+  // 使用识别结果填充表单
+  const useOcrResult = () => {
+    if (recognizedData) {
+      setContent(recognizedData.content)
+      setCorrectAnswer(recognizedData.correctAnswer)
+      setExplanation(recognizedData.analysis)
+      setKnowledgePoint(recognizedData.knowledgePoint)
+      if (recognizedData.difficulty) {
+        setDifficulty(recognizedData.difficulty as 'easy' | 'medium' | 'hard')
+      }
+    } else if (ocrResult && ocrResult !== '未识别到任何文字，请手动输入') {
+      setContent(ocrResult)
     }
   }
 
@@ -256,13 +215,18 @@ export default function NewWrongQuestionPage() {
         <h1 className="text-2xl font-bold text-text-primary">新增错题</h1>
       </div>
 
+      {/* 选择输入方式 */}
       <Card>
         <CardContent className="p-6">
           <h2 className="font-medium text-text-primary mb-4">选择输入方式</h2>
           <div className="grid grid-cols-2 gap-4">
             <button
               onClick={() => setInputType('manual')}
-              className={`p-6 rounded-xl border-2 transition-all ${inputType === 'manual' ? 'border-sky bg-sky-light' : 'border-border hover:border-sky/50'}`}
+              className={`p-6 rounded-xl border-2 transition-all ${
+                inputType === 'manual'
+                  ? 'border-sky bg-sky-light'
+                  : 'border-border hover:border-sky/50'
+              }`}
             >
               <Keyboard className={`w-10 h-10 mx-auto mb-3 ${inputType === 'manual' ? 'text-sky' : 'text-text-secondary'}`} />
               <p className="font-medium text-text-primary">手动输入</p>
@@ -270,16 +234,21 @@ export default function NewWrongQuestionPage() {
             </button>
             <button
               onClick={() => setInputType('camera')}
-              className={`p-6 rounded-xl border-2 transition-all ${inputType === 'camera' ? 'border-sky bg-sky-light' : 'border-border hover:border-sky/50'}`}
+              className={`p-6 rounded-xl border-2 transition-all ${
+                inputType === 'camera'
+                  ? 'border-sky bg-sky-light'
+                  : 'border-border hover:border-sky/50'
+              }`}
             >
               <Camera className={`w-10 h-10 mx-auto mb-3 ${inputType === 'camera' ? 'text-sky' : 'text-text-secondary'}`} />
               <p className="font-medium text-text-primary">拍照输入</p>
-              <p className="text-sm text-text-secondary mt-1">拍照识别题目（AI）</p>
+              <p className="text-sm text-text-secondary mt-1">拍照识别题目（OCR）</p>
             </button>
           </div>
         </CardContent>
       </Card>
 
+      {/* 手动输入表单 */}
       {inputType === 'manual' && (
         <Card>
           <CardContent className="p-6 space-y-4">
@@ -289,7 +258,7 @@ export default function NewWrongQuestionPage() {
                 <Select
                   options={subjectOptions}
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value as Subject | '')}
+                  onChange={(e) => setSubject(e.target.value)}
                   placeholder="选择学科"
                 />
               </div>
@@ -298,7 +267,7 @@ export default function NewWrongQuestionPage() {
                 <Select
                   options={difficultyOptions}
                   value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                  onChange={(e) => setDifficulty(e.target.value)}
                 />
               </div>
             </div>
@@ -370,18 +339,27 @@ export default function NewWrongQuestionPage() {
                 <Button variant="outline" className="w-full">取消</Button>
               </Link>
               <Button onClick={handleSubmit} className="flex-1 gap-2" disabled={loading}>
-                {loading ? '保存中...' : (<><Save className="w-4 h-4" />保存</>)}
+                {loading ? '保存中...' : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    保存
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
+      {/* 拍照输入 */}
       {inputType === 'camera' && (
         <Card>
           <CardContent className="p-6 space-y-4">
+            {/* 上传区域 */}
             <div
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${uploadedImage ? 'border-sky' : 'border-border hover:border-sky/50'}`}
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+                uploadedImage ? 'border-sky' : 'border-border hover:border-sky/50'
+              }`}
               onClick={() => fileInputRef.current?.click()}
             >
               <input
@@ -393,6 +371,7 @@ export default function NewWrongQuestionPage() {
               />
               {uploadedImage ? (
                 <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={uploadedImage} alt="上传的图片" className="max-h-64 mx-auto rounded-lg" />
                   <button
                     onClick={(e) => {
@@ -414,23 +393,31 @@ export default function NewWrongQuestionPage() {
               )}
             </div>
 
+            {/* OCR识别中 */}
             {isUploading && (
               <div className="flex items-center justify-center gap-2 py-4">
                 <Sparkles className="w-5 h-5 text-sky animate-pulse" />
-                <span className="text-text-secondary">AI 正在识别题目（可能需要 30-60 秒）...</span>
+                <span className="text-text-secondary">AI 正在识别题目...</span>
               </div>
             )}
 
+            {/* OCR结果 */}
             {ocrResult && !isUploading && (
               <div className="bg-sky-light rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-text-primary">识别结果</h3>
-                  <span className="text-sm text-text-secondary">已自动填表，可手动修改</span>
+                  <button
+                    onClick={useOcrResult}
+                    className="text-sm text-sky hover:underline"
+                  >
+                    使用此内容
+                  </button>
                 </div>
                 <pre className="text-sm text-text-secondary whitespace-pre-wrap">{ocrResult}</pre>
               </div>
             )}
 
+            {/* 手动补充信息 */}
             <div className="border-t border-border pt-4 mt-4">
               <h3 className="font-medium text-text-primary mb-4">补充信息</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -439,7 +426,7 @@ export default function NewWrongQuestionPage() {
                   <Select
                     options={subjectOptions}
                     value={subject}
-                    onChange={(e) => setSubject(e.target.value as Subject | '')}
+                    onChange={(e) => setSubject(e.target.value)}
                     placeholder="选择学科"
                   />
                 </div>
@@ -469,7 +456,12 @@ export default function NewWrongQuestionPage() {
                 <Button variant="outline" className="w-full">取消</Button>
               </Link>
               <Button onClick={handleSubmit} className="flex-1 gap-2" disabled={loading}>
-                {loading ? '保存中...' : (<><Save className="w-4 h-4" />保存</>)}
+                {loading ? '保存中...' : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    保存
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>

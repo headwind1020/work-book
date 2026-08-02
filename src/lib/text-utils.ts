@@ -24,43 +24,27 @@ export function stripLatex(input: string): string {
   // 1. 处理 \frac{a}{b} → a/b（支持嵌套）
   s = convertFrac(s)
 
-  // 2. 处理常见 LaTeX 命令（替换为可读字符）
-  const cmdMap: Record<string, string> = {
-    cdot: '·', times: '×', div: '÷', pm: '±', mp: '∓',
-    leq: '≤', geq: '≥', neq: '≠', approx: '≈', equiv: '≡',
-    left: '', right: '', big: '', Big: '',
-    sqrt: '√', sum: 'Σ', prod: 'Π', int: '∫', infty: '∞',
-    to: '→', gets: '←', Rightarrow: '⇒', Leftarrow: '⇐',
-    in: '∈', notin: '∉', subseteq: '⊆', supseteq: '⊇',
-    cup: '∪', cap: '∩', emptyset: '∅',
-    alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε',
-    pi: 'π', theta: 'θ', lambda: 'λ', mu: 'μ', sigma: 'σ',
-    phi: 'φ', omega: 'ω', tau: 'τ',
-    ',': '', ';': '', '!': '', ' ': '', quad: '  ', qquad: '    ',
-  }
-  s = s.replace(/\\([a-zA-Z]+)\b/g, (_, cmd) => cmdMap[cmd] ?? '')
+  // 2. 下标：x_1 → x₁；x_{10} → x₁₀
+  s = s.replace(/_\{(\d+)\}/g, (_, n) => toSubscript(n))
+  s = s.replace(/_(\d)/g, (_, n) => toSubscript(n))
 
-  // 3. 下标：x_1 → x₁；x_{10} → x₁₀
-  s = s.replace(/_\{([^{}]+)\}/g, (_, n) => n.split('').map((c: string) => '₀₁₂₃₄₅₆₇₈₉'[+c] || c).join(''))
-  s = s.replace(/_(\d)/g, (_, n) => '₀₁₂₃₄₅₆₇₈₉'[+n] || n)
+  // 3. 上标：x^2 → x²；x^{10} → x¹⁰
+  s = s.replace(/\^\{(\d+)\}/g, (_, n) => toSuperscript(n))
+  s = s.replace(/\^(\d)/g, (_, n) => toSuperscript(n))
 
-  // 4. 上标：x^2 → x²；x^{10} → x¹⁰
-  s = s.replace(/\^\{([^{}]+)\}/g, (_, n) => n.split('').map((c: string) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[+c] || c).join(''))
-  s = s.replace(/\^(\d)/g, (_, n) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[+n] || n)
-
-  // 5. \\ → 换行
+  // 4. \\ → 换行
   s = s.replace(/\\\\/g, '\n')
 
-  // 6. 删除所有 $ 符号
+  // 5. 删除所有 $ 符号
   s = s.replace(/\$/g, '')
+
+  // 6. 删除 \cmd{...} 命令（保留花括号内文本）
+  s = s.replace(/\\[a-zA-Z]+\b/g, '')
 
   // 7. 删除剩余大括号
   s = s.replace(/[{}]/g, '')
 
-  // 8. 清理残留反斜杠
-  s = s.replace(/\\/g, '')
-
-  // 9. 折叠多余空白
+  // 8. 折叠多余空白
   s = s.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
 
   return s
