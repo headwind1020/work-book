@@ -35,34 +35,26 @@ const MAAS_BASE_URL = 'https://llm-6o2wwdhcy3mx1z74.cn-beijing.maas.aliyuncs.com
 const MAAS_API_KEY = 'sk-19e2d059b5df4bb485f32d9233c104f0'
 const MAAS_MODEL = 'qwen-vl-max'
 
-const SYSTEM_PROMPT = `你是初中数学错题解析老师，必须严格按以下流程作答：
+const SYSTEM_PROMPT = `你是初中数学错题解析老师。
 
-## 一、解题流程（先步骤、后答案）
-1. 审题：列出已知条件、未知量、约束关系
-2. 列式：建立方程/不等式/函数表达式
-3. 求解：一步步推导，每步有明确依据
-4. 分类讨论：涉及绝对值/区间/分情况，必须逐一讨论
-5. 自检（必做）：
-   - 把答案代入原题验证
-   - 检查算术错误（符号、系数、移项）
-   - 检查逻辑自洽
-   - 发现错误立即修正并重新给出答案
+**最关键的输出规则**：
+- content 字段**只含题目原文**，不要任何解题步骤、推导过程或自检
+- 把所有解题过程放在 analysis 字段
+- 答案放在 correctAnswer 字段
+- 知识点放在 knowledgePoint 字段
 
-## 二、输出格式
-- 先输出完整解题步骤
-- 步骤之后再输出最终答案
-- 答案要具体：数值、坐标、表达式
-- 全部用 JSON 输出，不要 markdown 代码块
+字段定义（严格遵守）：
+- content: 仅题目文字（不含"解："、"分析："等引导词）
+- correctAnswer: 最终答案（坐标、值或表达式）
+- analysis: 完整解题步骤 + 自检
+- knowledgePoint: ≤10 字
 
-## 三、表达规范
-- 公式用 LaTeX 行内格式 $...$
-- 步骤用"步骤1: 步骤2: "编号
-- 自检环节标【自检】`
+只用 JSON 输出，不要 markdown 代码块。`
 
 export default function NewWrongQuestionPage() {
   const router = useRouter()
   const [inputType, setInputType] = useState<'manual' | 'camera'>('manual')
-  const [subject, setSubject] = useState<Subject | ''>('')
+  const [subject, setSubject] = useState<Subject | ''>('math')
   const [questionType, setQuestionType] = useState('')
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [content, setContent] = useState('')
@@ -210,13 +202,16 @@ export default function NewWrongQuestionPage() {
         if (result.analysis) setExplanation(result.analysis)
         if (result.knowledgePoint) setKnowledgePoint(result.knowledgePoint)
         if (result.difficulty) setDifficulty(result.difficulty as Difficulty)
-        setOcrResult(
-          result.correctAnswer
-            ? `✅ 已识别\n\n题目：${result.content}\n\n正确答案：${result.correctAnswer}`
-            : `已识别：${result.content}`,
-        )
+
+        // 卡片只展示"是否成功 + 识别到的答案摘要"
+        const summary = result.correctAnswer
+          ? `✅ 已识别完成\n\n题目已填，答案：${result.correctAnswer.slice(0, 80)}${result.correctAnswer.length > 80 ? '...' : ''}`
+          : result.knowledgePoint
+            ? `✅ 已识别（未返回答案，请手动填写）\n\n知识点：${result.knowledgePoint}`
+            : `✅ 已识别题目，请填写正确答案`
+        setOcrResult(summary)
       } else {
-        setOcrResult('未识别到任何文字，请手动输入')
+        setOcrResult('⚠️ 未识别到任何文字，请手动输入')
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : '识别失败'
