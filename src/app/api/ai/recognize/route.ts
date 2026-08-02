@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { stripLatex } from '@/lib/text-utils'
 
 export const runtime = 'nodejs'
+export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,25 +19,40 @@ export async function POST(request: NextRequest) {
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'DASHSCOPE_API_KEY 未配置' },
+        { error: 'DASHSCOPE_API_KEY 未配置，请在 Vercel 环境变量中设置' },
         { status: 500 }
       )
     }
 
     const cleanedBase64 = imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '')
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: `你是初中数学错题解析老师，必须严格按以下流程作答：
+    // Vercel 默认请求体 4.5MB；prompt 加上 base64 后接近限制时容易被网关截断
+    if (cleanedBase64.length > 5 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: '图片过大（>3.5MB），请压缩或重新拍照后重试' },
+        { status: 413 }
+      )
+    }
+
+    // 给上游 DashScope 请求加 25s 超时，避免被 Vercel 函数 10s 默认超时截断
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 25_000)
+
+    let response: Response
+    try {
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'system',
+              content: `你是初中数学错题解析老师，必须严格按以下流程作答：
 
 ## 一、解题流程（先步骤、后答案）
 1. **审题**：先列出已知条件、未知量、约束关系
@@ -60,17 +76,17 @@ export async function POST(request: NextRequest) {
 - 步骤用"步骤1: ... 步骤2: ..."编号
 - 自检环节单独一段，标"【自检】"
 - 自检发现问题要明确说明"原答案有误，修正为..."`,
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image_url',
-                image_url: { url: `data:image/jpeg;base64,${cleanedBase64}` },
-              },
-              {
-                type: 'text',
-                text: `分析这张${subject ?? '数学'}错题图片。
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:image/jpeg;base64,${cleanedBase64}` },
+                },
+                {
+                  type: 'text',
+                  text: `分析这张${subject ?? '数学'}错题图片。
 
 **严格**输出 JSON（不要 markdown 标记、不要任何额外文字）：
 
@@ -88,14 +104,25 @@ export async function POST(request: NextRequest) {
 - analysis 必须先写步骤，步骤之后必须包含【自检】环节
 - 自检要把答案代入原题验证
 - 如果分类讨论有多种情况，请全部列出`,
-              },
-            ],
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 4096,
+                },
+              ],
+            },
+          ],
+temperature: 0.1,
+        max_tokens: 2048,
+        response_format: { type: 'json_object' },
       }),
     })
+    } catch (upstreamErr) {
+      clearTimeout(timeout)
+      const aborted = upstreamErr instanceof Error && upstreamErr.name === 'AbortError'
+      console.error('Qwen-VL fetch 异常:', upstreamErr)
+      return NextResponse.json(
+        { error: aborted ? '识别超时（>25s），请稍后重试或换张更清晰的图片' : `上游识别失败：${(upstreamErr as Error).message}` },
+        { status: aborted ? 504 : 502 }
+      )
+    }
+    clearTimeout(timeout)
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -108,8 +135,11 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json()
     const message = data.choices?.[0]?.message || {}
-    const content = message.content || ''
+    let content = message.content || ''
     const reasoning = message.reasoning_content || ''
+
+    // 剥离可能的 <think>...</think> 块
+    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
 
     let parsed: Record<string, unknown> = {}
 
