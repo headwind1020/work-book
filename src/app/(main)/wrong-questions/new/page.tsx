@@ -167,9 +167,34 @@ export default function NewWrongQuestionPage() {
       }
     }
 
+    // 兜底 1：从 analysis 文本里提取"最终答案"
+    let correctAnswer = (parsed.correctAnswer as string) ?? ''
+    if (!correctAnswer && parsed.analysis) {
+      const analysis = String(parsed.analysis)
+      const patterns = [
+        /【自检】[\s\S]*?答案[：:]\s*([^\n。]+)/,
+        /最终答案[：:]\s*([^\n。]+)/,
+        /答案[：:]\s*([^\n。]+)/,
+        /∴\s*([^\n。]+)/,
+      ]
+      for (const p of patterns) {
+        const m = analysis.match(p)
+        if (m) {
+          correctAnswer = m[1].trim()
+          break
+        }
+      }
+    }
+
+    // 兜底 2：从 content 里提取（如果模型没分字段）
+    if (!correctAnswer && parsed.content) {
+      const m = String(parsed.content).match(/答案[：:]\s*([^\n。]+)/)
+      if (m) correctAnswer = m[1].trim()
+    }
+
     return {
       content: stripLatex((parsed.content as string) ?? ''),
-      correctAnswer: stripLatex((parsed.correctAnswer as string) ?? ''),
+      correctAnswer: stripLatex(correctAnswer),
       analysis: stripLatex((parsed.analysis as string) ?? ''),
       knowledgePoint: stripLatex((parsed.knowledgePoint as string) ?? ''),
       difficulty: (parsed.difficulty as string) ?? 'medium',
