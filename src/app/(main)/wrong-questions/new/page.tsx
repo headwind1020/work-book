@@ -28,6 +28,13 @@ export default function NewWrongQuestionPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [ocrResult, setOcrResult] = useState('')
+  const [recognizedData, setRecognizedData] = useState<{
+    content: string
+    correctAnswer: string
+    analysis: string
+    knowledgePoint: string
+    difficulty: string
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 组件卸载时释放 blob URL
@@ -89,28 +96,68 @@ export default function NewWrongQuestionPage() {
         reader.readAsDataURL(file)
       })
 
-      const res = await fetch('/api/ocr', {
+      const res = await fetch('/api/ai/recognize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: dataUrl }),
+        body: JSON.stringify({
+          imageBase64: dataUrl,
+          subject: subject || 'math',
+        }),
       })
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'OCR 识别失败')
+        throw new Error(err.error || '识别失败')
       }
 
       const data = await res.json()
-      if (data.lines && data.lines.length > 0) {
-        setOcrResult(data.lines.join('\n'))
-      } else if (data.text) {
-        setOcrResult(data.text)
+
+      if (data.content) {
+        let recognized = {
+          content: data.content ?? '',
+          correctAnswer: data.correctAnswer ?? '',
+          analysis: data.analysis ?? '',
+          knowledgePoint: data.knowledgePoint ?? '',
+          difficulty: data.difficulty ?? 'medium',
+        }
+
+        // 兜底 1：模型把正确答塞进了 content 字段（前面带"正确答案："等关键字）
+        if (!recognized.correctAnswer && recognized.content) {
+          const m = recognized.content.match(/正确答案[：:]\s*([\s\S]+?)(?:\n\n|$)/)
+          if (m) recognized.correctAnswer = m[1].trim()
+        }
+
+        // 兜底 2：content 本身是 JSON 字符串（模型偶发把整段 JSON 吐回 content）
+        if ((!recognized.correctAnswer || recognized.content.startsWith('{')) && recognized.content.startsWith('{')) {
+          try {
+            const inner = JSON.parse(recognized.content)
+            if (inner.content) recognized.content = inner.content
+            if (inner.correctAnswer) recognized.correctAnswer = inner.correctAnswer
+            if (inner.analysis) recognized.analysis = inner.analysis
+            if (inner.knowledgePoint) recognized.knowledgePoint = inner.knowledgePoint
+          } catch {
+            // 不是 JSON，忽略
+          }
+        }
+
+        setRecognizedData(recognized)
+        // 自动填充表单
+        setContent(recognized.content)
+        if (recognized.correctAnswer) setCorrectAnswer(recognized.correctAnswer)
+        if (recognized.analysis) setExplanation(recognized.analysis)
+        if (recognized.knowledgePoint) setKnowledgePoint(recognized.knowledgePoint)
+        if (recognized.difficulty) setDifficulty(recognized.difficulty as 'easy' | 'medium' | 'hard')
+        setOcrResult(
+          recognized.correctAnswer
+            ? `✅ 已识别题目\n\n题目：${recognized.content}\n\n正确答案：${recognized.correctAnswer}`
+            : `已识别：${recognized.content}`
+        )
       } else {
         setOcrResult('未识别到任何文字，请手动输入')
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'OCR 识别失败'
-      console.error('OCR 错误:', err)
+      const message = err instanceof Error ? err.message : '识别失败'
+      console.error('识别错误:', err)
       setError(message)
       setOcrResult('')
     } finally {
@@ -118,9 +165,17 @@ export default function NewWrongQuestionPage() {
     }
   }
 
-  // 使用OCR结果填充表单
+  // 使用识别结果填充表单
   const useOcrResult = () => {
-    if (ocrResult && ocrResult !== '未识别到任何文字，请手动输入') {
+    if (recognizedData) {
+      setContent(recognizedData.content)
+      setCorrectAnswer(recognizedData.correctAnswer)
+      setExplanation(recognizedData.analysis)
+      setKnowledgePoint(recognizedData.knowledgePoint)
+      if (recognizedData.difficulty) {
+        setDifficulty(recognizedData.difficulty as 'easy' | 'medium' | 'hard')
+      }
+    } else if (ocrResult && ocrResult !== '未识别到任何文字，请手动输入') {
       setContent(ocrResult)
     }
   }
