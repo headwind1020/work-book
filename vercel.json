@@ -3,5 +3,19 @@
   "devCommand": "npm run dev",
   "installCommand": "npm ci",
   "framework": "nextjs",
-  "regions": ["hkg1"]
+  "regions": ["hkg1"],
+  "functions": {
+    "src/app/api/ai/recognize/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/ai/chat/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/ocr/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/upload/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }

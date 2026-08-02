@@ -34,9 +34,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 给上游 DashScope 请求加 25s 超时，避免被 Vercel 函数 10s 默认超时截断
+    // 给上游 DashScope 请求加 50s 超时
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 25_000)
+    const timeout = setTimeout(() => controller.abort(), 50_000)
 
     let response: Response
     try {
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       const aborted = upstreamErr instanceof Error && upstreamErr.name === 'AbortError'
       console.error('Qwen-VL fetch 异常:', upstreamErr)
       return NextResponse.json(
-        { error: aborted ? '识别超时（>25s），请稍后重试或换张更清晰的图片' : `上游识别失败：${(upstreamErr as Error).message}` },
+        { error: aborted ? '识别超时（>50s），请稍后重试或换张更清晰的图片' : `上游识别失败：${(upstreamErr as Error).message}` },
         { status: aborted ? 504 : 502 }
       )
     }
