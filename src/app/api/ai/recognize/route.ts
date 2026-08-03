@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { stripLatex } from '@/lib/text-utils'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 90
 
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const candidateBaseUrls = [DEFAULT_BASE_URL]
 
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 25_000)
+    const timeout = setTimeout(() => controller.abort(), 80_000)
 
     let response: Response | null = null
     let lastError: Error | null = null
@@ -81,8 +81,8 @@ export async function POST(request: NextRequest) {
           ],
         },
       ],
-      temperature: 0.3,
-      max_tokens: 4096,
+      temperature: 0.2,
+      max_tokens: 2048,
     })
 
     // 依次尝试每个 baseUrl，每个 baseUrl 内最多 3 次重试
