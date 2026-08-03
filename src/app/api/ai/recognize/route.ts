@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
       max_tokens: 2048,
     })
 
-    // 依次尝试每个 baseUrl，每个 baseUrl 内最多 3 次重试
+    // 依次尝试每个 baseUrl，每个 baseUrl 内最多 6 次重试
     outer: for (const tryBaseUrl of candidateBaseUrls) {
-      for (let attempt = 1; attempt <= 3; attempt++) {
+      for (let attempt = 1; attempt <= 6; attempt++) {
         try {
           console.log(`[recognize] 尝试 ${tryBaseUrl} 第 ${attempt}/3 次`)
           const r = await fetch(`${tryBaseUrl}/chat/completions`, {
@@ -112,8 +112,8 @@ export async function POST(request: NextRequest) {
           lastError = err instanceof Error ? err : new Error(String(err))
           console.warn(`[recognize] ${tryBaseUrl} 第 ${attempt} 次失败:`, lastError.message)
           // 网络层失败，间隔 500ms 再试
-          if (attempt < 3) {
-            await new Promise((r) => setTimeout(r, 500))
+          if (attempt < 6) {
+            await new Promise((r) => setTimeout(r, 800))
           }
         }
       }

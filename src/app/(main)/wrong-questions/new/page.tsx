@@ -77,7 +77,7 @@ export default function NewWrongQuestionPage() {
   }
 
   // 将图片压缩到最长边 1024px、JPEG 0.7，避免 Vercel 4.5MB 请求体限制
-  const compressImage = async (file: File, maxEdge = 1024, quality = 0.7): Promise<string> => {
+  const compressImage = async (file: File, maxEdge = 768, quality = 0.65): Promise<string> => {
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result as string)
