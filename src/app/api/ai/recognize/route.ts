@@ -4,6 +4,8 @@ import { stripLatex } from '@/lib/text-utils'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -14,7 +16,6 @@ export async function POST(request: NextRequest) {
     }
 
     const apiKey = process.env.DASHSCOPE_API_KEY
-    const baseUrl = process.env.DASHSCOPE_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
     const model = process.env.QWEN_VL_MODEL || 'qwen-vl-max'
 
     if (!apiKey) {
@@ -26,7 +27,6 @@ export async function POST(request: NextRequest) {
 
     const cleanedBase64 = imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '')
 
-    // Vercel 默认请求体 4.5MB；prompt 加上 base64 后接近限制时容易被网关截断
     if (cleanedBase64.length > 5 * 1024 * 1024) {
       return NextResponse.json(
         { error: '图片过大（>3.5MB），请压缩或重新拍照后重试' },
@@ -34,41 +34,51 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 给上游 DashScope 请求加 25s 超时（提速）
+    // 候选 baseUrl：先去重，env 配置优先，其次默认公开端点
+    const configuredUrl = process.env.DASHSCOPE_BASE_URL || DEFAULT_BASE_URL
+    const candidateBaseUrls = Array.from(
+      new Set([configuredUrl, DEFAULT_BASE_URL])
+    )
+
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 25_000)
 
-    let response: Response
-    try {
-      response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model,
-          messages: [
-{
-            role: 'system',
-            content: `你是初中数学错题解析助手。要求：
+    let response: Response | null = null
+    let lastError: Error | null = null
+
+    // 依次尝试每个 baseUrl，第一个成功的就停下
+    for (const tryBaseUrl of candidateBaseUrls) {
+      try {
+        console.log(`[recognize] 尝试 baseUrl: ${tryBaseUrl}`)
+        const r = await fetch(`${tryBaseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: 'system',
+                content: `你是初中数学错题解析助手。要求：
 1. 快速识别图片中的题目
 2. 给出正确答案（必须具体：数值或表达式）
 3. 写简要解题步骤（不必过详，关键步骤即可）
 
 只输出 JSON，不要任何解释文字。`,
-          },
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'image_url',
-                  image_url: { url: `data:image/jpeg;base64,${cleanedBase64}` },
-                },
-{
-                type: 'text',
-                text: `分析这张${subject ?? '数学'}错题图片。
+              },
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'image_url',
+                    image_url: { url: `data:image/jpeg;base64,${cleanedBase64}` },
+                  },
+                  {
+                    type: 'text',
+                    text: `分析这张${subject ?? '数学'}错题图片。
 
 **严格**输出 JSON（不要 markdown 标记、不要任何额外文字）：
 
@@ -80,24 +90,43 @@ export async function POST(request: NextRequest) {
   "difficulty": "easy|medium|hard",
   "errorReason": "常见错误原因"
 }`,
+                  },
+                ],
               },
-              ],
-            },
-          ],
-          temperature: 0.3,
-          max_tokens: 4096,
-        }),
-      })
-    } catch (upstreamErr) {
-      clearTimeout(timeout)
-      const aborted = upstreamErr instanceof Error && upstreamErr.name === 'AbortError'
-      console.error('Qwen-VL fetch 异常:', upstreamErr)
+            ],
+            temperature: 0.3,
+            max_tokens: 4096,
+          }),
+        })
+        // 401/403/404 等认证/路由错误不算成功，继续尝试下一个
+        if (r.status === 401 || r.status === 403 || r.status === 404) {
+          const t = await r.text()
+          console.warn(`[recognize] ${tryBaseUrl} 认证失败:`, r.status, t)
+          lastError = new Error(`${tryBaseUrl} 认证失败 (${r.status})`)
+          continue
+        }
+        response = r
+        break
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err))
+        console.warn(`[recognize] ${tryBaseUrl} 失败:`, lastError.message)
+      }
+    }
+    clearTimeout(timeout)
+
+    if (!response) {
+      const aborted = lastError?.name === 'AbortError'
+      const message = lastError?.message || '未知错误'
+      console.error('所有 baseUrl 都失败:', message)
       return NextResponse.json(
-        { error: aborted ? '识别超时（>25s），请稍后重试或换张更清晰的图片' : `上游识别失败：${(upstreamErr as Error).message}` },
+        {
+          error: aborted
+            ? '识别超时（>25s），请稍后重试或换张更清晰的图片'
+            : `上游识别失败：${message}`,
+        },
         { status: aborted ? 504 : 502 }
       )
     }
-    clearTimeout(timeout)
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -153,7 +182,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       content: stripLatex((parsed.content as string) ?? ''),
       correctAnswer: stripLatex((parsed.correctAnswer as string) ?? ''),
-      analysis: stripLatex((parsed.analysis as string) || (reasoning ? `\n\n【模型推理】\n${reasoning}` : '')),
+      analysis: stripLatex(
+        (parsed.analysis as string) ||
+          (reasoning ? `\n\n【模型推理】\n${reasoning}` : '')
+      ),
       knowledgePoint: stripLatex((parsed.knowledgePoint as string) ?? ''),
       difficulty: parsed.difficulty ?? 'medium',
       errorReason: stripLatex((parsed.errorReason as string) ?? ''),
