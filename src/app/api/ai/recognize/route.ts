@@ -44,39 +44,28 @@ export async function POST(request: NextRequest) {
     let response: Response | null = null
     let lastError: Error | null = null
 
-    // 依次尝试每个 baseUrl，第一个成功的就停下
-    for (const tryBaseUrl of candidateBaseUrls) {
-      try {
-        console.log(`[recognize] 尝试 baseUrl: ${tryBaseUrl}`)
-        const r = await fetch(`${tryBaseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model,
-            messages: [
-              {
-                role: 'system',
-                content: `你是初中数学错题解析助手。要求：
+    const fetchPayload = JSON.stringify({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: `你是初中数学错题解析助手。要求：
 1. 快速识别图片中的题目
 2. 给出正确答案（必须具体：数值或表达式）
 3. 写简要解题步骤（不必过详，关键步骤即可）
 
 只输出 JSON，不要任何解释文字。`,
-              },
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'image_url',
-                    image_url: { url: `data:image/jpeg;base64,${cleanedBase64}` },
-                  },
-                  {
-                    type: 'text',
-                    text: `分析这张${subject ?? '数学'}错题图片。
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:image/jpeg;base64,${cleanedBase64}` },
+            },
+            {
+              type: 'text',
+              text: `分析这张${subject ?? '数学'}错题图片。
 
 **严格**输出 JSON（不要 markdown 标记、不要任何额外文字）：
 
@@ -88,26 +77,45 @@ export async function POST(request: NextRequest) {
   "difficulty": "easy|medium|hard",
   "errorReason": "常见错误原因"
 }`,
-                  },
-                ],
-              },
-            ],
-            temperature: 0.3,
-            max_tokens: 4096,
-          }),
-        })
-        // 401/403/404 等认证/路由错误不算成功，继续尝试下一个
-        if (r.status === 401 || r.status === 403 || r.status === 404) {
-          const t = await r.text()
-          console.warn(`[recognize] ${tryBaseUrl} 认证失败:`, r.status, t)
-          lastError = new Error(`${tryBaseUrl} 认证失败 (${r.status})`)
-          continue
+            },
+          ],
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 4096,
+    })
+
+    // 依次尝试每个 baseUrl，每个 baseUrl 内最多 3 次重试
+    outer: for (const tryBaseUrl of candidateBaseUrls) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`[recognize] 尝试 ${tryBaseUrl} 第 ${attempt}/3 次`)
+          const r = await fetch(`${tryBaseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+            },
+            signal: controller.signal,
+            body: fetchPayload,
+          })
+          // 401/403/404 等认证/路由错误不算成功，跳到下一个 baseUrl
+          if (r.status === 401 || r.status === 403 || r.status === 404) {
+            const t = await r.text()
+            console.warn(`[recognize] ${tryBaseUrl} 认证失败:`, r.status, t)
+            lastError = new Error(`${tryBaseUrl} 认证失败 (${r.status})`)
+            continue outer
+          }
+          response = r
+          break outer
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err))
+          console.warn(`[recognize] ${tryBaseUrl} 第 ${attempt} 次失败:`, lastError.message)
+          // 网络层失败，间隔 500ms 再试
+          if (attempt < 3) {
+            await new Promise((r) => setTimeout(r, 500))
+          }
         }
-        response = r
-        break
-      } catch (err) {
-        lastError = err instanceof Error ? err : new Error(String(err))
-        console.warn(`[recognize] ${tryBaseUrl} 失败:`, lastError.message)
       }
     }
     clearTimeout(timeout)
