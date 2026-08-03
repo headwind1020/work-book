@@ -12,6 +12,11 @@ const notoSans = Noto_Sans_SC({
 export const metadata: Metadata = {
   title: "智能错题簿 - 初中生错题管理平台",
   description: "帮助初中生记录错题、分析知识点、针对性巩固提升",
+  other: {
+    "cache-control": "no-cache, no-store, must-revalidate",
+    "pragma": "no-cache",
+    "expires": "0",
+  },
 };
 
 export default function RootLayout({
