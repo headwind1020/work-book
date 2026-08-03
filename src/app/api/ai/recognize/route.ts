@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.DASHSCOPE_API_KEY
     const model = process.env.QWEN_VL_MODEL || 'qwen-vl-max'
+    // 强制使用公开端点：Vercel serverless 函数访问不到 maas 专属域
 
     if (!apiKey) {
       return NextResponse.json(
@@ -34,11 +35,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 候选 baseUrl：先去重，env 配置优先，其次默认公开端点
-    const configuredUrl = process.env.DASHSCOPE_BASE_URL || DEFAULT_BASE_URL
-    const candidateBaseUrls = Array.from(
-      new Set([configuredUrl, DEFAULT_BASE_URL])
-    )
+    // 强制使用默认公开端点（Vercel 网络环境不支持 maas 专属域）
+    const candidateBaseUrls = [DEFAULT_BASE_URL]
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 25_000)
