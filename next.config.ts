@@ -1,23 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // 强制无缓存：每次都拿最新版本，杜绝打开旧版
+  // 强制无缓存：所有路由包括 _next/static 都不缓存
+  // 否则 Vercel CDN 会缓存 JS bundle，新部署的代码永远拿不到
   async headers() {
     return [
       {
-        source: "/((?!_next/static|_next/image|favicon.ico).*)",
+        source: "/:path*",
         headers: [
           { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
           { key: "Pragma", value: "no-cache" },
           { key: "Expires", value: "0" },
           { key: "Surrogate-Control", value: "no-store" },
-        ],
-      },
-      {
-        // 静态资源保留长缓存
-        source: "/_next/static/(.*)",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
       },
     ]
