@@ -3,7 +3,12 @@ import { createBrowserClient } from '@supabase/ssr'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
+// 没有 env 时给一个占位 URL，SSR 预渲染不会真正调用 Supabase
+const isConfigured = !!(supabaseUrl && supabaseAnonKey)
+
+export const supabase = isConfigured
+  ? createBrowserClient(supabaseUrl, supabaseAnonKey)
+  : createBrowserClient('https://placeholder.supabase.co', 'placeholder')
 
 // 类型定义
 export type UserRole = 'student' | 'teacher' | 'parent'
