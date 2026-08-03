@@ -36,7 +36,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 强制使用默认公开端点（Vercel 网络环境不支持 maas 专属域）
-    const candidateBaseUrls = [DEFAULT_BASE_URL]
+    // 优先尝试 env 配置的（可以是你自己的代理），失败则回退到默认公开端点
+    const envBaseUrl = process.env.DASHSCOPE_BASE_URL
+    const candidateBaseUrls = envBaseUrl
+      ? Array.from(new Set([envBaseUrl, DEFAULT_BASE_URL]))
+      : [DEFAULT_BASE_URL]
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 80_000)

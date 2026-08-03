@@ -1,0 +1,15 @@
+[Unit]
+Description=DashScope Proxy Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/dashscope-proxy
+ExecStart=/usr/bin/node /opt/dashscope-proxy/proxy.js
+Restart=always
+RestartSec=10
+Environment="DASHSCOPE_API_KEY=sk-19e2d059b5df4bb485f32d9233c104f0"
+
+[Install]
+WantedBy=multi-user.target
